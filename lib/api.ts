@@ -154,7 +154,7 @@ export const getDashboardSummary = async () => {
 
   const totalItems = items.length
   const lowStock = items.filter((item: any) => item.quantity <= item.min_stock).length
-  const categories = [...new Set(items.map((item: any) => item.category).filter(Boolean))].length
+  const categories = Array.from(new Set(items.map((item: any) => item.category).filter(Boolean))).length
   const totalValue = items.reduce((sum: number, item: any) => sum + (item.quantity * (item.price || 0)), 0)
   const lowStockItems = items
     .filter((item: any) => item.quantity <= item.min_stock)
