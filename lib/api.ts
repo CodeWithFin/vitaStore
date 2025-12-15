@@ -103,9 +103,9 @@ export const stockIn = async (data: { item_id: number; quantity: number; notes?:
   if (updateError) throw updateError
 }
 
-export const stockOut = async (data: { item_id: number; quantity: number; notes?: string }) => {
-  // Check stock availability
-  const { data: item } = await supabase.from('items').select('quantity').eq('id', data.item_id).single()
+export const stockOut = async (data: { item_id: number; quantity: number; notes?: string; shop?: string }) => {
+  // Check stock availability and get item details
+  const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', data.item_id).single()
   if (!item) throw new Error('Item not found')
   if (item.quantity < data.quantity) {
     throw new Error(`Insufficient stock. Available: ${item.quantity}`)
@@ -116,6 +116,7 @@ export const stockOut = async (data: { item_id: number; quantity: number; notes?
     type: 'OUT',
     quantity: data.quantity,
     notes: data.notes || '',
+    shop: data.shop || null,
   })
 
   if (transError) throw transError
@@ -130,6 +131,139 @@ export const stockOut = async (data: { item_id: number; quantity: number; notes?
     .eq('id', data.item_id)
 
   if (updateError) throw updateError
+
+  // Send email notification (non-blocking)
+  if (data.shop) {
+    try {
+      const { sendEmail, formatStockOutEmail } = await import('./email')
+      
+      const { subject, html } = formatStockOutEmail(
+        item.name,
+        data.quantity,
+        item.unit || 'pcs',
+        data.shop,
+        item.sku,
+        data.notes
+      )
+      
+      // Send asynchronously (don't wait for response)
+      // The API route will read EMAIL_RECIPIENT from server-side env
+      sendEmail({
+        to: '', // Will be set by API route from server env
+        subject,
+        html,
+      }).catch((error) => {
+        console.error('Email notification failed:', error)
+        // Don't throw - notification failure shouldn't break the transaction
+      })
+    } catch (error) {
+      console.error('Error setting up email notification:', error)
+      // Don't throw - notification failure shouldn't break the transaction
+    }
+  }
+}
+
+// Process multiple stock in transactions
+export const stockInMultiple = async (
+  items: Array<{ item_id: number; quantity: number; notes?: string }>,
+  globalNotes?: string
+) => {
+  // Process all items
+  for (const data of items) {
+    const { error: transError } = await supabase.from('transactions').insert({
+      item_id: data.item_id,
+      type: 'IN',
+      quantity: data.quantity,
+      notes: data.notes || globalNotes || '',
+    })
+
+    if (transError) throw transError
+
+    // Update item quantity
+    const { data: item } = await supabase.from('items').select('quantity').eq('id', data.item_id).single()
+    if (!item) throw new Error(`Item not found: ${data.item_id}`)
+
+    const { error: updateError } = await supabase
+      .from('items')
+      .update({ 
+        quantity: item.quantity + data.quantity,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', data.item_id)
+
+    if (updateError) throw updateError
+  }
+}
+
+// Process multiple stock out transactions
+export const stockOutMultiple = async (
+  items: Array<{ item_id: number; quantity: number; notes?: string }>,
+  shop: string,
+  globalNotes?: string
+) => {
+  // First, validate all items have sufficient stock
+  for (const data of items) {
+    const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', data.item_id).single()
+    if (!item) throw new Error(`Item not found: ${data.item_id}`)
+    if (item.quantity < data.quantity) {
+      throw new Error(`Insufficient stock for ${item.name}. Available: ${item.quantity}`)
+    }
+  }
+
+  // Get all item details for email
+  const itemDetails: any[] = []
+  
+  // Process all items
+  for (const data of items) {
+    const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', data.item_id).single()
+    if (!item) throw new Error(`Item not found: ${data.item_id}`)
+
+    const { error: transError } = await supabase.from('transactions').insert({
+      item_id: data.item_id,
+      type: 'OUT',
+      quantity: data.quantity,
+      notes: data.notes || globalNotes || '',
+      shop: shop || null,
+    })
+
+    if (transError) throw transError
+
+    // Update item quantity
+    const { error: updateError } = await supabase
+      .from('items')
+      .update({ 
+        quantity: item.quantity - data.quantity,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', data.item_id)
+
+    if (updateError) throw updateError
+
+    itemDetails.push({
+      ...item,
+      transactionQuantity: data.quantity,
+      transactionNotes: data.notes || globalNotes,
+    })
+  }
+
+  // Send email notification with all items (non-blocking)
+  if (shop && itemDetails.length > 0) {
+    try {
+      const { sendEmail, formatStockOutEmailMultiple } = await import('./email')
+      
+      const { subject, html } = formatStockOutEmailMultiple(itemDetails, shop)
+      
+      sendEmail({
+        to: '',
+        subject,
+        html,
+      }).catch((error) => {
+        console.error('Email notification failed:', error)
+      })
+    } catch (error) {
+      console.error('Error setting up email notification:', error)
+    }
+  }
 }
 
 // Dashboard

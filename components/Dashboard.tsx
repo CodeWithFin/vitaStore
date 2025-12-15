@@ -11,6 +11,11 @@ import {
   Edit3,
   Trash2,
   ArrowRight,
+  TrendingUp,
+  TrendingDown,
+  MapPin,
+  Calendar,
+  FileText,
 } from 'lucide-react'
 import {
   getDashboardSummary,
@@ -20,10 +25,18 @@ import {
   deleteItem,
   stockIn,
   stockOut,
+  stockInMultiple,
+  stockOutMultiple,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import ItemModal from './ItemModal'
 import TransactionModal from './TransactionModal'
+import Notification from './Notification'
+
+interface NotificationState {
+  message: string
+  type: 'success' | 'error' | 'info'
+}
 
 export default function Dashboard() {
   const [summary, setSummary] = useState<any>(null)
@@ -36,6 +49,7 @@ export default function Dashboard() {
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [transactionType, setTransactionType] = useState<'IN' | 'OUT' | null>(null)
   const [editingItem, setEditingItem] = useState<any>(null)
+  const [notification, setNotification] = useState<NotificationState | null>(null)
   
   const canvasRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<any>(null)
@@ -276,18 +290,24 @@ export default function Dashboard() {
     }
   }
 
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setNotification({ message, type })
+  }
+
   const handleItemSave = async (itemData: any) => {
     try {
       if (editingItem) {
         await updateItem(editingItem.id, itemData)
+        showNotification('Item updated successfully', 'success')
       } else {
         await createItem(itemData)
+        showNotification('Item added successfully', 'success')
       }
       await loadData()
       setShowItemModal(false)
       setEditingItem(null)
     } catch (error: any) {
-      alert(error.message || 'Error saving item')
+      showNotification(error.message || 'Error saving item', 'error')
     }
   }
 
@@ -295,24 +315,35 @@ export default function Dashboard() {
     if (!window.confirm('Are you sure you want to delete this item?')) return
     try {
       await deleteItem(id)
+      showNotification('Item deleted successfully', 'success')
       await loadData()
     } catch (error: any) {
-      alert(error.message || 'Error deleting item')
+      showNotification(error.message || 'Error deleting item', 'error')
     }
   }
 
   const handleTransaction = async (data: any) => {
     try {
       if (transactionType === 'IN') {
-        await stockIn(data)
+        await stockInMultiple(data.items || [data], data.notes)
+        const itemCount = data.items ? data.items.length : 1
+        showNotification(
+          `Stock in: ${itemCount} item${itemCount > 1 ? 's' : ''} processed successfully`,
+          'success'
+        )
       } else {
-        await stockOut(data)
+        await stockOutMultiple(data.items || [data], data.shop, data.notes)
+        const itemCount = data.items ? data.items.length : 1
+        showNotification(
+          `Stock out: ${itemCount} item${itemCount > 1 ? 's' : ''} → ${data.shop || 'Unknown shop'}`,
+          'success'
+        )
       }
       await loadData()
       setShowTransactionModal(false)
       setTransactionType(null)
     } catch (error: any) {
-      alert(error.message || 'Error processing transaction')
+      showNotification(error.message || 'Error processing transaction', 'error')
     }
   }
 
@@ -345,12 +376,6 @@ export default function Dashboard() {
 
   const categories = Array.from(new Set(items.map((item) => item.category).filter(Boolean)))
 
-  const formatKES = (value: number) =>
-    new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      maximumFractionDigits: 0,
-    }).format(value || 0)
 
   if (loading || !summary) {
     return (
@@ -431,7 +456,7 @@ export default function Dashboard() {
             <span className="font-mono text-xs text-[#9A3412] uppercase tracking-[0.2em]">System Status</span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8">
             <div className="vellum-glass rounded-sm p-4 border border-neutral-200/50">
               <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Total Items</div>
               <div className="font-serif text-4xl text-[#1C1917]">{summary.totalItems}</div>
@@ -443,10 +468,6 @@ export default function Dashboard() {
             <div className="vellum-glass rounded-sm p-4 border border-neutral-200/50">
               <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Categories</div>
               <div className="font-serif text-4xl text-[#1C1917]">{summary.categories}</div>
-            </div>
-            <div className="vellum-glass rounded-sm p-4 border border-neutral-200/50">
-              <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Value</div>
-              <div className="font-serif text-4xl text-[#1C1917]">{formatKES(summary.totalValue)}</div>
             </div>
           </div>
 
@@ -620,34 +641,147 @@ export default function Dashboard() {
 
         {/* Outbound History */}
         <div className="relative z-20 pointer-events-auto mt-6 md:mt-8">
-        <div className="vellum-glass rounded-sm border border-neutral-200/60 overflow-hidden">
-          <div className="border-b border-neutral-200/60 px-4 py-3 flex justify-between items-center bg-white/60">
-            <span className="font-serif italic text-base md:text-lg text-[#1C1917]">Recently Moved Out</span>
-            <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500">Last 10</span>
+        <div className="vellum-glass rounded-sm border border-neutral-200/60 overflow-hidden shadow-lg">
+          <div className="border-b border-neutral-200/60 px-4 py-4 flex justify-between items-center bg-gradient-to-r from-red-50/50 to-orange-50/30">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-100/50 rounded-sm border border-red-200/50">
+                <TrendingDown className="w-4 h-4 text-red-600" />
+              </div>
+              <span className="font-serif italic text-base md:text-lg text-[#1C1917]">Recently Moved Out</span>
+            </div>
+            <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500 bg-white/50 px-2 py-1 rounded-sm">Last 10</span>
           </div>
-          <div className="divide-y divide-neutral-200/60 max-h-[300px] md:max-h-none overflow-y-auto">
+          <div className="divide-y divide-neutral-200/40 max-h-[300px] md:max-h-none overflow-y-auto">
             {summary.recentTransactions.filter((tx: any) => tx.type === 'OUT').length === 0 ? (
-              <div className="px-4 py-4 text-neutral-500 font-serif italic text-sm">No outbound history yet</div>
+              <div className="px-4 py-8 text-center text-neutral-400 font-serif italic text-sm">
+                <TrendingDown className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>No outbound history yet</p>
+              </div>
             ) : (
               summary.recentTransactions
                 .filter((tx: any) => tx.type === 'OUT')
-                .map((tx: any) => (
-                  <div key={tx.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div className="flex flex-col gap-1 flex-1 min-w-0">
-                      <span className="font-serif text-sm text-[#1C1917] truncate">{tx.items?.name || 'Unknown item'}</span>
-                      <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500">
-                        {tx.quantity} {tx.items?.unit || 'pcs'} · {tx.items?.sku || 'N/A'}
-                      </span>
-                      {tx.notes && (
-                        <span className="font-mono text-[9px] md:text-[10px] text-neutral-500 truncate">
-                          {tx.notes}
+                .map((tx: any, index: number) => (
+                  <div key={tx.id} className="px-4 py-4 hover:bg-white/40 transition-colors group">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex gap-3 flex-1 min-w-0">
+                        <div className="flex-shrink-0 mt-1">
+                          <div className="w-8 h-8 rounded-sm bg-red-100/50 border border-red-200/50 flex items-center justify-center">
+                            <ArrowUpCircle className="w-4 h-4 text-red-600" />
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                          <div className="flex items-start gap-2">
+                            <Package className="w-3.5 h-3.5 text-neutral-400 mt-0.5 flex-shrink-0" />
+                            <span className="font-serif text-sm font-medium text-[#1C1917] truncate">{tx.items?.name || 'Unknown item'}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-600 bg-neutral-100/50 px-2 py-0.5 rounded-sm">
+                              {tx.quantity} {tx.items?.unit || 'pcs'}
+                            </span>
+                            <span className="font-mono text-[10px] text-neutral-500">
+                              SKU: {tx.items?.sku || 'N/A'}
+                            </span>
+                          </div>
+                          {tx.shop && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <MapPin className="w-3 h-3 text-[#78350F]" />
+                              <span className="font-serif text-xs text-[#78350F] font-medium">
+                                {tx.shop}
+                              </span>
+                            </div>
+                          )}
+                          {tx.notes && (
+                            <div className="flex items-start gap-1.5 mt-1">
+                              <FileText className="w-3 h-3 text-neutral-400 mt-0.5 flex-shrink-0" />
+                              <span className="font-serif text-[11px] text-neutral-500 italic truncate">
+                                {tx.notes}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 sm:ml-4">
+                        <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                        <span className="font-mono text-[10px] md:text-[11px] text-neutral-500 whitespace-nowrap">
+                          {new Date(tx.created_at).toLocaleDateString('en-KE', { 
+                            day: 'numeric', 
+                            month: 'short',
+                            year: 'numeric'
+                          })}
                         </span>
-                      )}
+                      </div>
                     </div>
-                    <div className="text-left sm:text-right flex-shrink-0">
-                      <span className="font-mono text-[10px] md:text-[11px] text-neutral-500">
-                        {new Date(tx.created_at).toLocaleDateString()}
-                      </span>
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+
+        </div>
+
+        {/* Inbound History */}
+        <div className="relative z-20 pointer-events-auto mt-6 md:mt-8">
+        <div className="vellum-glass rounded-sm border border-neutral-200/60 overflow-hidden shadow-lg">
+          <div className="border-b border-neutral-200/60 px-4 py-4 flex justify-between items-center bg-gradient-to-r from-green-50/50 to-emerald-50/30">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-100/50 rounded-sm border border-green-200/50">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+              </div>
+              <span className="font-serif italic text-base md:text-lg text-[#1C1917]">Recently Stocked In</span>
+            </div>
+            <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500 bg-white/50 px-2 py-1 rounded-sm">Last 10</span>
+          </div>
+          <div className="divide-y divide-neutral-200/40 max-h-[300px] md:max-h-none overflow-y-auto">
+            {summary.recentTransactions.filter((tx: any) => tx.type === 'IN').length === 0 ? (
+              <div className="px-4 py-8 text-center text-neutral-400 font-serif italic text-sm">
+                <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>No inbound history yet</p>
+              </div>
+            ) : (
+              summary.recentTransactions
+                .filter((tx: any) => tx.type === 'IN')
+                .map((tx: any, index: number) => (
+                  <div key={tx.id} className="px-4 py-4 hover:bg-white/40 transition-colors group">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex gap-3 flex-1 min-w-0">
+                        <div className="flex-shrink-0 mt-1">
+                          <div className="w-8 h-8 rounded-sm bg-green-100/50 border border-green-200/50 flex items-center justify-center">
+                            <ArrowDownCircle className="w-4 h-4 text-green-600" />
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                          <div className="flex items-start gap-2">
+                            <Package className="w-3.5 h-3.5 text-neutral-400 mt-0.5 flex-shrink-0" />
+                            <span className="font-serif text-sm font-medium text-[#1C1917] truncate">{tx.items?.name || 'Unknown item'}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-green-700 bg-green-100/50 px-2 py-0.5 rounded-sm font-semibold">
+                              +{tx.quantity} {tx.items?.unit || 'pcs'}
+                            </span>
+                            <span className="font-mono text-[10px] text-neutral-500">
+                              SKU: {tx.items?.sku || 'N/A'}
+                            </span>
+                          </div>
+                          {tx.notes && (
+                            <div className="flex items-start gap-1.5 mt-1">
+                              <FileText className="w-3 h-3 text-neutral-400 mt-0.5 flex-shrink-0" />
+                              <span className="font-serif text-[11px] text-neutral-500 italic truncate">
+                                {tx.notes}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 sm:ml-4">
+                        <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                        <span className="font-mono text-[10px] md:text-[11px] text-neutral-500 whitespace-nowrap">
+                          {new Date(tx.created_at).toLocaleDateString('en-KE', { 
+                            day: 'numeric', 
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -684,6 +818,14 @@ export default function Dashboard() {
             setTransactionType(null)
           }}
           onSave={handleTransaction}
+        />
+      )}
+
+      {notification && (
+        <Notification
+          message={notification.message}
+          type={notification.type}
+          onClose={() => setNotification(null)}
         />
       )}
 

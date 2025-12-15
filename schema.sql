@@ -25,6 +25,7 @@ create table if not exists public.transactions (
   type text check (type in ('IN','OUT')) not null,
   quantity integer not null,
   notes text,
+  shop text,
   created_at timestamptz default now()
 );
 

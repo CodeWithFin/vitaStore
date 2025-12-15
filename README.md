@@ -22,6 +22,14 @@ npm install
 ```
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# Email Notifications (Optional - using Gmail SMTP)
+# Get your App Password from: https://myaccount.google.com/apppasswords
+# Note: You need to enable 2-Step Verification first, then generate an App Password
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password-here
+EMAIL_FROM=your-email@gmail.com
+EMAIL_RECIPIENT=finley.mwangola12@gmail.com
 ```
 
 3) Supabase schema (run in Supabase SQL editor)
@@ -61,6 +69,18 @@ create index if not exists idx_transactions_item_id on transactions(item_id);
 5) Auth
    - Create a Supabase email/password user in the Supabase Auth dashboard
    - Use this email/password to log in to the application
+
+6) Email Notifications (Optional - Gmail SMTP)
+   - Enable 2-Step Verification on your Google Account: https://myaccount.google.com/security
+   - Generate an App Password: https://myaccount.google.com/apppasswords
+     - Select "Mail" and "Other (Custom name)" and enter "VitaStore"
+     - Copy the 16-character App Password
+   - Add to your `.env.local` file:
+     - `SMTP_USER`: Your Gmail address (e.g., your-email@gmail.com)
+     - `SMTP_PASS`: The 16-character App Password (not your regular password)
+     - `EMAIL_FROM`: Your Gmail address
+     - `EMAIL_RECIPIENT`: Email address to receive notifications
+   - Note: If email is not configured, stock out transactions will still work, but no notifications will be sent
 
 ## Running
 

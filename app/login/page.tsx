@@ -83,10 +83,13 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-stone-900 text-white px-6 py-3 rounded-xl font-medium hover:bg-stone-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 mt-6"
+            className="group relative w-full bg-gradient-to-r from-[#1C1917] to-[#78350F] text-white px-8 py-4 rounded-sm font-serif text-lg tracking-wide hover:from-[#78350F] hover:to-[#9A3412] transition-all duration-500 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed mt-6 shadow-lg hover:shadow-xl overflow-hidden"
           >
-            <LogIn className="w-5 h-5" />
-            {loading ? 'Logging in...' : 'Login'}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+            <LogIn className="w-5 h-5 relative z-10 transition-transform group-hover:translate-x-1" />
+            <span className="relative z-10 font-mono text-xs uppercase tracking-widest">
+              {loading ? 'Authenticating...' : 'Enter System'}
+            </span>
           </button>
         </form>
       </div>
