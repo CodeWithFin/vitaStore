@@ -80,17 +80,17 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
   const selectedItem = items.find((item) => item.id === parseInt(currentItem.item_id))
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="vellum-glass rounded-sm p-8 max-w-lg w-full border border-neutral-200/50">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-serif text-ink">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="vellum-glass rounded-sm p-4 md:p-8 max-w-lg w-full border border-neutral-200/50 my-auto max-h-[95vh] flex flex-col">
+        <div className="flex justify-between items-center mb-4 md:mb-6 flex-shrink-0">
+          <h2 className="text-xl md:text-2xl font-serif text-ink">
             Stock {type === 'IN' ? 'In' : 'Out'}
           </h2>
           <button onClick={onClose} className="text-neutral-400 hover:text-ink transition-colors">
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 md:w-6 md:h-6" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto pr-1">
           {/* Shop Selection (for Stock Out) */}
           {type === 'OUT' && (
             <div>
@@ -232,7 +232,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
             ></textarea>
           </div>
 
-          <div className="flex gap-3 mt-6">
+          <div className="flex gap-3 mt-6 pb-2 flex-shrink-0 sticky bottom-0 bg-[#FDFCF8]/95 backdrop-blur-sm pt-4 border-t border-neutral-200/30 -mx-4 md:-mx-8 px-4 md:px-8">
             <button
               type="submit"
               disabled={transactionItems.length === 0}
