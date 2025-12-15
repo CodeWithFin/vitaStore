@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   const [showItemModal, setShowItemModal] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [transactionType, setTransactionType] = useState<'IN' | 'OUT' | null>(null)
@@ -335,10 +336,21 @@ export default function Dashboard() {
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = !categoryFilter || item.category === categoryFilter
-    return matchesSearch && matchesCategory
+    const isLowStock = item.quantity <= item.min_stock
+    const isOutOfStock = item.quantity === 0
+    const status = isOutOfStock ? 'out' : isLowStock ? 'low' : 'ok'
+    const matchesStatus = !statusFilter || status === statusFilter
+    return matchesSearch && matchesCategory && matchesStatus
   })
 
   const categories = Array.from(new Set(items.map((item) => item.category).filter(Boolean)))
+
+  const formatKES = (value: number) =>
+    new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: 'KES',
+      maximumFractionDigits: 0,
+    }).format(value || 0)
 
   if (loading || !summary) {
     return (
@@ -434,7 +446,7 @@ export default function Dashboard() {
             </div>
             <div className="vellum-glass rounded-sm p-4 border border-neutral-200/50">
               <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-500 mb-2">Value</div>
-              <div className="font-serif text-4xl text-[#1C1917]">${summary.totalValue.toFixed(0)}</div>
+              <div className="font-serif text-4xl text-[#1C1917]">{formatKES(summary.totalValue)}</div>
             </div>
           </div>
 
@@ -494,30 +506,40 @@ export default function Dashboard() {
 
         {/* Items Table */}
         <div className="pointer-events-auto w-full vellum-glass rounded-sm max-h-[400px] md:max-h-none overflow-y-auto mt-6 md:mt-0">
-          <div className="border-b border-neutral-200/60 px-4 py-3 flex flex-col md:flex-row md:justify-between md:items-center gap-3 sticky top-0 bg-[#FDFCF8]/95 backdrop-blur-sm">
+            <div className="border-b border-neutral-200/60 px-4 py-3 flex flex-col md:flex-row md:justify-between md:items-center gap-3 sticky top-0 bg-[#FDFCF8]/95 backdrop-blur-sm">
             <span className="font-serif italic text-lg text-[#1C1917]">Inventory</span>
-            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search..."
-                className="px-3 py-2 text-xs border border-neutral-200 rounded-sm bg-white/50 font-mono w-full sm:w-auto"
-              />
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 text-xs border border-neutral-200 rounded-sm bg-white/50 font-mono w-full sm:w-auto"
-              >
-                <option value="">All</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search..."
+                  className="px-3 py-2 text-xs border border-neutral-200 rounded-sm bg-white/50 font-mono w-full"
+                />
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="px-3 py-2 text-xs border border-neutral-200 rounded-sm bg-white/50 font-mono w-full"
+                >
+                  <option value="">All Categories</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 text-xs border border-neutral-200 rounded-sm bg-white/50 font-mono w-full"
+                >
+                  <option value="">All Status</option>
+                  <option value="ok">OK</option>
+                  <option value="low">Low</option>
+                  <option value="out">Out</option>
+                </select>
+              </div>
             </div>
-          </div>
 
           <div className="p-4 overflow-x-auto">
             <table className="w-full min-w-[480px] text-left">

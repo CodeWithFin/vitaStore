@@ -8,8 +8,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        serif: ['Cormorant Garamond', 'serif'],
+        sans: ['Roboto', 'Inter', 'sans-serif'],
+        // Route all serif usage to Roboto so all text uses the Roboto family
+        serif: ['Roboto', 'Inter', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
       colors: {
