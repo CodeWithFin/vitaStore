@@ -338,7 +338,7 @@ export default function Dashboard() {
     return matchesSearch && matchesCategory
   })
 
-  const categories = [...new Set(items.map((item) => item.category).filter(Boolean))]
+  const categories = Array.from(new Set(items.map((item) => item.category).filter(Boolean)))
 
   if (loading || !summary) {
     return (
