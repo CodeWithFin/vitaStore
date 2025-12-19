@@ -18,6 +18,7 @@ export default function ItemModal({ item, onClose, onSave }: ItemModalProps) {
     min_stock: 0,
     unit: 'pcs',
     price: 0,
+    expiry_date: '',
   })
 
   useEffect(() => {
@@ -30,13 +31,19 @@ export default function ItemModal({ item, onClose, onSave }: ItemModalProps) {
         min_stock: item.min_stock || 0,
         unit: item.unit || 'pcs',
         price: item.price || 0,
+        expiry_date: item.expiry_date || '',
       })
     }
   }, [item])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(formData)
+    // Convert empty expiry_date to null for optional field
+    const submitData = {
+      ...formData,
+      expiry_date: formData.expiry_date || null,
+    }
+    onSave(submitData)
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,14 +87,13 @@ export default function ItemModal({ item, onClose, onSave }: ItemModalProps) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
-                SKU *
+                SKU (optional)
               </label>
               <input
                 type="text"
                 name="sku"
                 value={formData.sku}
                 onChange={handleChange}
-                required
                 className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
               />
             </div>
@@ -148,19 +154,33 @@ export default function ItemModal({ item, onClose, onSave }: ItemModalProps) {
               />
             </div>
           </div>
-          <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
-              Price (optional)
-            </label>
-            <input
-              type="number"
-              name="price"
-              value={formData.price}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
+                Price (optional)
+              </label>
+              <input
+                type="number"
+                name="price"
+                value={formData.price}
+                onChange={handleChange}
+                min="0"
+                step="0.01"
+                className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
+                Expiry Date (optional)
+              </label>
+              <input
+                type="date"
+                name="expiry_date"
+                value={formData.expiry_date}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
+              />
+            </div>
           </div>
           <div className="flex gap-3 mt-6">
             <button

@@ -8,7 +8,7 @@ create extension if not exists "uuid-ossp";
 create table if not exists public.items (
   id bigserial primary key,
   name text not null,
-  sku text unique not null,
+  sku text unique,
   unit text default 'pcs',
   quantity integer not null default 0,
   min_stock integer not null default 0,
@@ -26,6 +26,7 @@ create table if not exists public.transactions (
   quantity integer not null,
   notes text,
   shop text,
+  transaction_date date,
   created_at timestamptz default now()
 );
 

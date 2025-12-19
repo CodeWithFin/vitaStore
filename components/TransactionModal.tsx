@@ -25,6 +25,8 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
   })
   const [shop, setShop] = useState('')
   const [globalNotes, setGlobalNotes] = useState('')
+  const [itemSearchTerm, setItemSearchTerm] = useState('')
+  const [transactionDate, setTransactionDate] = useState('')
 
   const handleAddItem = () => {
     if (!currentItem.item_id || !currentItem.quantity) {
@@ -74,8 +76,19 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
       items: transactionItems,
       shop: type === 'OUT' ? shop : undefined,
       notes: globalNotes,
+      transaction_date: transactionDate || undefined,
     })
   }
+
+  const availableItems = items.filter((item) => !transactionItems.some((ti) => ti.item_id === item.id))
+  const filteredItemOptions = availableItems.filter((item) => {
+    if (!itemSearchTerm.trim()) return true
+    const term = itemSearchTerm.toLowerCase()
+    return (
+      item.name.toLowerCase().includes(term) ||
+      (item.sku && item.sku.toLowerCase().includes(term))
+    )
+  })
 
   const selectedItem = items.find((item) => item.id === parseInt(currentItem.item_id))
 
@@ -91,6 +104,19 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto pr-1">
+          {/* Transaction Date */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
+              Transaction Date (optional)
+            </label>
+            <input
+              type="date"
+              value={transactionDate}
+              onChange={(e) => setTransactionDate(e.target.value)}
+              className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
+            />
+          </div>
+
           {/* Shop Selection (for Stock Out) */}
           {type === 'OUT' && (
             <div>
@@ -116,23 +142,36 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
             <h3 className="font-serif text-sm text-ink mb-4">Add Items</h3>
             
             <div className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
-                  Select Item
-                </label>
+              <div className="space-y-2">
+                <div className="flex flex-col gap-1">
+                  <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500">
+                    Select Item
+                  </label>
+                  <input
+                    type="text"
+                    value={itemSearchTerm}
+                    onChange={(e) => setItemSearchTerm(e.target.value)}
+                    placeholder="Search by name or SKU..."
+                    className="w-full px-3 py-2 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono text-xs"
+                  />
+                </div>
                 <select
                   value={currentItem.item_id}
                   onChange={(e) => setCurrentItem({ ...currentItem, item_id: e.target.value })}
                   className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-serif"
                 >
                   <option value="">Choose an item...</option>
-                  {items
-                    .filter((item) => !transactionItems.some((ti) => ti.item_id === item.id))
-                    .map((item) => (
+                  {filteredItemOptions.length === 0 ? (
+                    <option value="" disabled>
+                      No matching items
+                    </option>
+                  ) : (
+                    filteredItemOptions.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name} ({item.quantity} {item.unit || 'pcs'} available)
                       </option>
-                    ))}
+                    ))
+                  )}
                 </select>
               </div>
 

@@ -78,20 +78,22 @@ export const getTransactions = async (params?: { itemId?: number; type?: string;
   return data || []
 }
 
-export const stockIn = async (data: { item_id: number; quantity: number; notes?: string }) => {
+export const stockIn = async (data: { item_id: number; quantity: number; notes?: string; transaction_date?: string }) => {
+  // Get item details for email
+  const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', data.item_id).single()
+  if (!item) throw new Error('Item not found')
+
   const { error: transError } = await supabase.from('transactions').insert({
     item_id: data.item_id,
     type: 'IN',
     quantity: data.quantity,
     notes: data.notes || '',
+    transaction_date: data.transaction_date || null,
   })
 
   if (transError) throw transError
 
   // Update item quantity
-  const { data: item } = await supabase.from('items').select('quantity').eq('id', data.item_id).single()
-  if (!item) throw new Error('Item not found')
-
   const { error: updateError } = await supabase
     .from('items')
     .update({ 
@@ -101,9 +103,35 @@ export const stockIn = async (data: { item_id: number; quantity: number; notes?:
     .eq('id', data.item_id)
 
   if (updateError) throw updateError
+
+  // Send email notification (non-blocking)
+  try {
+    const { sendEmail, formatStockInEmail } = await import('./email')
+    
+    const { subject, html } = formatStockInEmail(
+      item.name,
+      data.quantity,
+      item.unit || 'pcs',
+      item.sku,
+      data.notes
+    )
+    
+    // Send asynchronously (don't wait for response)
+    sendEmail({
+      to: '', // Will be set by API route from server env
+      subject,
+      html,
+    }).catch((error) => {
+      console.error('Email notification failed:', error)
+      // Don't throw - notification failure shouldn't break the transaction
+    })
+  } catch (error) {
+    console.error('Error setting up email notification:', error)
+    // Don't throw - notification failure shouldn't break the transaction
+  }
 }
 
-export const stockOut = async (data: { item_id: number; quantity: number; notes?: string; shop?: string }) => {
+export const stockOut = async (data: { item_id: number; quantity: number; notes?: string; shop?: string; transaction_date?: string }) => {
   // Check stock availability and get item details
   const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', data.item_id).single()
   if (!item) throw new Error('Item not found')
@@ -117,6 +145,7 @@ export const stockOut = async (data: { item_id: number; quantity: number; notes?
     quantity: data.quantity,
     notes: data.notes || '',
     shop: data.shop || null,
+    transaction_date: data.transaction_date || null,
   })
 
   if (transError) throw transError
@@ -166,23 +195,28 @@ export const stockOut = async (data: { item_id: number; quantity: number; notes?
 // Process multiple stock in transactions
 export const stockInMultiple = async (
   items: Array<{ item_id: number; quantity: number; notes?: string }>,
-  globalNotes?: string
+  globalNotes?: string,
+  transactionDate?: string
 ) => {
+  // Get all item details for email
+  const itemDetails: any[] = []
+  
   // Process all items
   for (const data of items) {
+    const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', data.item_id).single()
+    if (!item) throw new Error(`Item not found: ${data.item_id}`)
+
     const { error: transError } = await supabase.from('transactions').insert({
       item_id: data.item_id,
       type: 'IN',
       quantity: data.quantity,
       notes: data.notes || globalNotes || '',
+      transaction_date: transactionDate || null,
     })
 
     if (transError) throw transError
 
     // Update item quantity
-    const { data: item } = await supabase.from('items').select('quantity').eq('id', data.item_id).single()
-    if (!item) throw new Error(`Item not found: ${data.item_id}`)
-
     const { error: updateError } = await supabase
       .from('items')
       .update({ 
@@ -192,6 +226,31 @@ export const stockInMultiple = async (
       .eq('id', data.item_id)
 
     if (updateError) throw updateError
+
+    itemDetails.push({
+      ...item,
+      transactionQuantity: data.quantity,
+      transactionNotes: data.notes || globalNotes,
+    })
+  }
+
+  // Send email notification with all items (non-blocking)
+  if (itemDetails.length > 0) {
+    try {
+      const { sendEmail, formatStockInEmailMultiple } = await import('./email')
+      
+      const { subject, html } = formatStockInEmailMultiple(itemDetails)
+      
+      sendEmail({
+        to: '',
+        subject,
+        html,
+      }).catch((error) => {
+        console.error('Email notification failed:', error)
+      })
+    } catch (error) {
+      console.error('Error setting up email notification:', error)
+    }
   }
 }
 
@@ -199,7 +258,8 @@ export const stockInMultiple = async (
 export const stockOutMultiple = async (
   items: Array<{ item_id: number; quantity: number; notes?: string }>,
   shop: string,
-  globalNotes?: string
+  globalNotes?: string,
+  transactionDate?: string
 ) => {
   // First, validate all items have sufficient stock
   for (const data of items) {
@@ -224,6 +284,7 @@ export const stockOutMultiple = async (
       quantity: data.quantity,
       notes: data.notes || globalNotes || '',
       shop: shop || null,
+      transaction_date: transactionDate || null,
     })
 
     if (transError) throw transError
