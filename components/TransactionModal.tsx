@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { X, Plus, Trash2 } from 'lucide-react'
 
 interface TransactionModalProps {
@@ -27,6 +27,26 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
   const [globalNotes, setGlobalNotes] = useState('')
   const [itemSearchTerm, setItemSearchTerm] = useState('')
   const [transactionDate, setTransactionDate] = useState('')
+  const [showItemDropdown, setShowItemDropdown] = useState(false)
+  const [selectedItemIds, setSelectedItemIds] = useState<number[]>([])
+  const [itemQuantities, setItemQuantities] = useState<Record<number, string>>({})
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowItemDropdown(false)
+      }
+    }
+
+    if (showItemDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showItemDropdown])
 
   const handleAddItem = () => {
     if (!currentItem.item_id || !currentItem.quantity) {
@@ -55,10 +75,72 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
       quantity: '',
       notes: '',
     })
+    setItemSearchTerm('')
+    setShowItemDropdown(false)
   }
 
   const handleRemoveItem = (index: number) => {
     setTransactionItems((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleSelectItem = (itemId: number, isCheckboxClick: boolean = false) => {
+    if (isCheckboxClick) {
+      // Toggle multi-select
+      if (selectedItemIds.includes(itemId)) {
+        // Remove from selection
+        setSelectedItemIds(selectedItemIds.filter(id => id !== itemId))
+        const newQuantities = { ...itemQuantities }
+        delete newQuantities[itemId]
+        setItemQuantities(newQuantities)
+      } else {
+        // Add to selection
+        setSelectedItemIds([...selectedItemIds, itemId])
+        setItemQuantities({ ...itemQuantities, [itemId]: '' })
+      }
+      // Keep dropdown open for multi-select
+    } else {
+      // Single-item selection (click on item name)
+      setCurrentItem({ ...currentItem, item_id: itemId.toString() })
+      setItemSearchTerm('')
+      setShowItemDropdown(false)
+    }
+  }
+
+  const handleAddSelectedItems = () => {
+    const itemsToAdd: TransactionItem[] = []
+    
+    for (const itemId of selectedItemIds) {
+      const quantity = itemQuantities[itemId]
+      if (!quantity || parseInt(quantity) <= 0) {
+        alert(`Please enter a quantity for ${items.find(i => i.id === itemId)?.name || 'selected item'}`)
+        return
+      }
+      
+      const item = items.find(i => i.id === itemId)
+      if (type === 'OUT' && item && parseInt(quantity) > item.quantity) {
+        alert(`Insufficient stock for ${item.name}. Available: ${item.quantity}`)
+        return
+      }
+
+      itemsToAdd.push({
+        item_id: itemId,
+        quantity: parseInt(quantity),
+        notes: '',
+      })
+    }
+
+    if (itemsToAdd.length === 0) {
+      alert('Please select at least one item and enter quantities')
+      return
+    }
+
+    setTransactionItems((prev) => [...prev, ...itemsToAdd])
+    
+    // Reset selections
+    setSelectedItemIds([])
+    setItemQuantities({})
+    setItemSearchTerm('')
+    setShowItemDropdown(false)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -93,8 +175,8 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
   const selectedItem = items.find((item) => item.id === parseInt(currentItem.item_id))
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="vellum-glass rounded-sm p-4 md:p-8 max-w-lg w-full border border-neutral-200/50 my-auto max-h-[95vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto overflow-x-hidden">
+      <div className="vellum-glass rounded-sm p-4 md:p-8 max-w-lg w-full border border-neutral-200/50 my-auto max-h-[95vh] flex flex-col overflow-x-hidden">
         <div className="flex justify-between items-center mb-4 md:mb-6 flex-shrink-0">
           <h2 className="text-xl md:text-2xl font-serif text-ink">
             Stock {type === 'IN' ? 'In' : 'Out'}
@@ -103,7 +185,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
             <X className="w-5 h-5 md:w-6 md:h-6" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto pr-1">
+        <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto overflow-x-hidden pr-1">
           {/* Transaction Date */}
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
@@ -142,70 +224,180 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
             <h3 className="font-serif text-sm text-ink mb-4">Add Items</h3>
             
             <div className="space-y-3">
-              <div className="space-y-2">
-                <div className="flex flex-col gap-1">
-                  <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500">
-                    Select Item
-                  </label>
+              <div className="relative" ref={dropdownRef}>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
+                  Select Item
+                </label>
+                <div className="relative">
                   <input
                     type="text"
                     value={itemSearchTerm}
-                    onChange={(e) => setItemSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setItemSearchTerm(e.target.value)
+                      setShowItemDropdown(true)
+                      setCurrentItem({ ...currentItem, item_id: '' })
+                    }}
+                    onFocus={() => setShowItemDropdown(true)}
                     placeholder="Search by name or SKU..."
-                    className="w-full px-3 py-2 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono text-xs"
+                    className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-serif text-sm"
                   />
-                </div>
-                <select
-                  value={currentItem.item_id}
-                  onChange={(e) => setCurrentItem({ ...currentItem, item_id: e.target.value })}
-                  className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-serif"
-                >
-                  <option value="">Choose an item...</option>
-                  {filteredItemOptions.length === 0 ? (
-                    <option value="" disabled>
-                      No matching items
-                    </option>
-                  ) : (
-                    filteredItemOptions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name} ({item.quantity} {item.unit || 'pcs'} available)
-                      </option>
-                    ))
+                  {showItemDropdown && filteredItemOptions.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-neutral-200 rounded-sm shadow-lg max-h-60 overflow-y-auto">
+                      {filteredItemOptions.map((item) => {
+                        const isSelected = selectedItemIds.includes(item.id)
+                        return (
+                          <div
+                            key={item.id}
+                            className={`w-full border-b border-neutral-100 last:border-b-0 flex items-center gap-3 ${
+                              isSelected ? 'bg-blue-50' : ''
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleSelectItem(item.id, true)}
+                              className="w-4 h-4 text-ink border-neutral-300 rounded focus:ring-ink ml-4"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSelectItem(item.id, false)}
+                              className="flex-1 text-left px-2 py-3 hover:bg-neutral-50 transition-colors"
+                            >
+                              <div className="font-serif text-sm text-ink">{item.name}</div>
+                              <div className="font-mono text-[10px] text-neutral-500 mt-1">
+                                SKU: {item.sku || 'N/A'} · {item.quantity} {item.unit || 'pcs'} available
+                              </div>
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
                   )}
-                </select>
+                  {showItemDropdown && itemSearchTerm && filteredItemOptions.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-neutral-200 rounded-sm shadow-lg">
+                      <div className="px-4 py-3 text-sm text-neutral-500 font-serif">
+                        No matching items found
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {selectedItem && type === 'OUT' && (
+              {/* Single Item Selection Display */}
+              {currentItem.item_id && selectedItem && selectedItemIds.length === 0 && (
+                <div className="mt-2 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-sm">
+                  <div className="font-serif text-sm text-ink">{selectedItem.name}</div>
+                  <div className="font-mono text-[10px] text-neutral-500">
+                    Selected: {selectedItem.quantity} {selectedItem.unit || 'pcs'} available
+                  </div>
+                </div>
+              )}
+
+              {selectedItem && type === 'OUT' && selectedItemIds.length === 0 && (
                 <div className="bg-yellow-100/50 border border-yellow-200/50 rounded-sm p-2 text-xs text-yellow-800 font-serif">
                   Available: {selectedItem.quantity} {selectedItem.unit || 'pcs'}
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
-                    Quantity
-                  </label>
-                  <input
-                    type="number"
-                    value={currentItem.quantity}
-                    onChange={(e) => setCurrentItem({ ...currentItem, quantity: e.target.value })}
-                    min="1"
-                    max={type === 'OUT' && selectedItem ? selectedItem.quantity : undefined}
-                    className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
-                  />
-                </div>
-                <div className="flex items-end">
+              {/* Selected Items with Quantities */}
+              {selectedItemIds.length > 0 && (
+                <div className="border border-neutral-200/50 rounded-sm p-4 bg-white/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-serif text-sm text-ink">
+                      Selected Items ({selectedItemIds.length})
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedItemIds([])
+                        setItemQuantities({})
+                      }}
+                      className="text-xs text-neutral-500 hover:text-ink font-mono uppercase tracking-widest"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {selectedItemIds.map((itemId) => {
+                      const item = items.find(i => i.id === itemId)
+                      if (!item) return null
+                      return (
+                        <div
+                          key={itemId}
+                          className="flex items-center gap-3 p-2 bg-white/50 rounded-sm border border-neutral-200/50"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-serif text-sm text-ink truncate">{item.name}</div>
+                            <div className="font-mono text-[10px] text-neutral-500">
+                              {item.quantity} {item.unit || 'pcs'} available
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              value={itemQuantities[itemId] || ''}
+                              onChange={(e) =>
+                                setItemQuantities({
+                                  ...itemQuantities,
+                                  [itemId]: e.target.value,
+                                })
+                              }
+                              min="1"
+                              max={type === 'OUT' ? item.quantity : undefined}
+                              placeholder="Qty"
+                              className="w-20 px-2 py-2 rounded-sm border border-neutral-200 bg-white focus:outline-none focus:ring-1 focus:ring-ink font-mono text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSelectItem(itemId)}
+                              className="text-red-500 hover:text-red-700 transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                   <button
                     type="button"
-                    onClick={handleAddItem}
+                    onClick={handleAddSelectedItems}
                     className="w-full bg-ink text-paper px-4 py-3 rounded-sm font-mono text-xs tracking-widest uppercase hover:bg-sepia transition-colors flex items-center justify-center gap-2"
                   >
                     <Plus className="w-4 h-4" />
-                    Add
+                    Add {selectedItemIds.length} Item{selectedItemIds.length > 1 ? 's' : ''}
                   </button>
                 </div>
-              </div>
+              )}
+
+              {/* Single Item Add (for backward compatibility) */}
+              {selectedItemIds.length === 0 && currentItem.item_id && (
+                <div className="grid grid-cols-2 gap-3 min-w-0">
+                  <div className="min-w-0">
+                    <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
+                      Quantity
+                    </label>
+                    <input
+                      type="number"
+                      value={currentItem.quantity}
+                      onChange={(e) => setCurrentItem({ ...currentItem, quantity: e.target.value })}
+                      min="1"
+                      max={type === 'OUT' && selectedItem ? selectedItem.quantity : undefined}
+                      className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
+                    />
+                  </div>
+                  <div className="flex items-end min-w-0">
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="w-full bg-ink text-paper px-4 py-3 rounded-sm font-mono text-xs tracking-widest uppercase hover:bg-sepia transition-colors flex items-center justify-center gap-2 min-w-0"
+                    >
+                      <Plus className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate">Add</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
@@ -234,11 +426,11 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
                   return (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-2 bg-white/50 rounded-sm border border-neutral-200/50"
+                      className="flex items-center justify-between p-2 bg-white/50 rounded-sm border border-neutral-200/50 min-w-0"
                     >
-                      <div className="flex-1">
-                        <div className="font-serif text-sm text-ink">{item?.name || 'Unknown'}</div>
-                        <div className="font-mono text-[10px] text-neutral-500">
+                      <div className="flex-1 min-w-0 pr-2">
+                        <div className="font-serif text-sm text-ink truncate">{item?.name || 'Unknown'}</div>
+                        <div className="font-mono text-[10px] text-neutral-500 truncate">
                           {ti.quantity} {item?.unit || 'pcs'}
                           {ti.notes && ` · ${ti.notes}`}
                         </div>
@@ -246,7 +438,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(index)}
-                        className="text-red-500 hover:text-red-700 transition-colors ml-2"
+                        className="text-red-500 hover:text-red-700 transition-colors ml-2 flex-shrink-0"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -271,18 +463,18 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
             ></textarea>
           </div>
 
-          <div className="flex gap-3 mt-6 pb-2 flex-shrink-0 sticky bottom-0 bg-[#FDFCF8]/95 backdrop-blur-sm pt-4 border-t border-neutral-200/30 -mx-4 md:-mx-8 px-4 md:px-8">
+          <div className="flex gap-3 mt-6 pb-2 flex-shrink-0 sticky bottom-0 bg-[#FDFCF8]/95 backdrop-blur-sm pt-4 border-t border-neutral-200/30 -mx-4 md:-mx-8 px-4 md:px-8 max-w-full overflow-x-hidden min-w-0">
             <button
               type="submit"
               disabled={transactionItems.length === 0}
-              className="flex-1 bg-ink text-paper px-6 py-3 rounded-sm font-mono text-xs tracking-widest uppercase hover:bg-sepia transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-ink text-paper px-4 md:px-6 py-3 rounded-sm font-mono text-xs tracking-widest uppercase hover:bg-sepia transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-0 truncate"
             >
-              Process {transactionItems.length > 0 ? `(${transactionItems.length} items)` : ''}
+              Process {transactionItems.length > 0 ? `(${transactionItems.length})` : ''}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-3 rounded-sm font-mono text-xs tracking-widest uppercase border border-neutral-200 hover:bg-white/50 transition-colors text-ink"
+              className="px-4 md:px-6 py-3 rounded-sm font-mono text-xs tracking-widest uppercase border border-neutral-200 hover:bg-white/50 transition-colors text-ink flex-shrink-0"
             >
               Cancel
             </button>

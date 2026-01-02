@@ -162,33 +162,31 @@ export const stockOut = async (data: { item_id: number; quantity: number; notes?
   if (updateError) throw updateError
 
   // Send email notification (non-blocking)
-  if (data.shop) {
-    try {
-      const { sendEmail, formatStockOutEmail } = await import('./email')
-      
-      const { subject, html } = formatStockOutEmail(
-        item.name,
-        data.quantity,
-        item.unit || 'pcs',
-        data.shop,
-        item.sku,
-        data.notes
-      )
-      
-      // Send asynchronously (don't wait for response)
-      // The API route will read EMAIL_RECIPIENT from server-side env
-      sendEmail({
-        to: '', // Will be set by API route from server env
-        subject,
-        html,
-      }).catch((error) => {
-        console.error('Email notification failed:', error)
-        // Don't throw - notification failure shouldn't break the transaction
-      })
-    } catch (error) {
-      console.error('Error setting up email notification:', error)
+  try {
+    const { sendEmail, formatStockOutEmail } = await import('./email')
+    
+    const { subject, html } = formatStockOutEmail(
+      item.name,
+      data.quantity,
+      item.unit || 'pcs',
+      data.shop || 'Unknown',
+      item.sku,
+      data.notes
+    )
+    
+    // Send asynchronously (don't wait for response)
+    // The API route will read EMAIL_RECIPIENT from server-side env
+    sendEmail({
+      to: '', // Will be set by API route from server env
+      subject,
+      html,
+    }).catch((error) => {
+      console.error('Email notification failed:', error)
       // Don't throw - notification failure shouldn't break the transaction
-    }
+    })
+  } catch (error) {
+    console.error('Error setting up email notification:', error)
+    // Don't throw - notification failure shouldn't break the transaction
   }
 }
 
@@ -308,11 +306,11 @@ export const stockOutMultiple = async (
   }
 
   // Send email notification with all items (non-blocking)
-  if (shop && itemDetails.length > 0) {
+  if (itemDetails.length > 0) {
     try {
       const { sendEmail, formatStockOutEmailMultiple } = await import('./email')
       
-      const { subject, html } = formatStockOutEmailMultiple(itemDetails, shop)
+      const { subject, html } = formatStockOutEmailMultiple(itemDetails, shop || 'Unknown')
       
       sendEmail({
         to: '',
