@@ -327,6 +327,52 @@ export const stockOutMultiple = async (
   }
 }
 
+// Delete a transaction and restore stock (for outbound transactions)
+export const deleteTransaction = async (transactionId: number) => {
+  // Get transaction details
+  const { data: transaction, error: transError } = await supabase
+    .from('transactions')
+    .select('*, items(*)')
+    .eq('id', transactionId)
+    .single()
+
+  if (transError) throw transError
+  if (!transaction) throw new Error('Transaction not found')
+
+  // Only allow deletion of OUT transactions
+  if (transaction.type !== 'OUT') {
+    throw new Error('Can only delete outbound transactions')
+  }
+
+  // Get current item quantity
+  const { data: item } = await supabase
+    .from('items')
+    .select('quantity')
+    .eq('id', transaction.item_id)
+    .single()
+
+  if (!item) throw new Error('Item not found')
+
+  // Delete the transaction
+  const { error: deleteError } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', transactionId)
+
+  if (deleteError) throw deleteError
+
+  // Restore the stock by adding the quantity back
+  const { error: updateError } = await supabase
+    .from('items')
+    .update({
+      quantity: item.quantity + transaction.quantity,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', transaction.item_id)
+
+  if (updateError) throw updateError
+}
+
 // Dashboard
 export const getDashboardSummary = async () => {
   const [itemsResult, transactionsResult] = await Promise.all([

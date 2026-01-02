@@ -28,6 +28,7 @@ import {
   stockOut,
   stockInMultiple,
   stockOutMultiple,
+  deleteTransaction,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import ItemModal from './ItemModal'
@@ -46,6 +47,7 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [outboundSearchTerm, setOutboundSearchTerm] = useState('')
   const [showItemModal, setShowItemModal] = useState(false)
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [transactionType, setTransactionType] = useState<'IN' | 'OUT' | null>(null)
@@ -348,6 +350,17 @@ export default function Dashboard() {
     }
   }
 
+  const handleDeleteTransaction = async (transactionId: number, itemName: string, quantity: number) => {
+    if (!window.confirm(`Are you sure you want to delete this transaction? This will restore ${quantity} ${itemName} back to inventory.`)) return
+    try {
+      await deleteTransaction(transactionId)
+      showNotification(`Transaction deleted. ${quantity} ${itemName} restored to inventory.`, 'success')
+      await loadData()
+    } catch (error: any) {
+      showNotification(error.message || 'Error deleting transaction', 'error')
+    }
+  }
+
   const openStockIn = () => {
     setTransactionType('IN')
     setShowTransactionModal(true)
@@ -364,9 +377,10 @@ export default function Dashboard() {
   }
 
   const filteredItems = items.filter((item) => {
+    const searchLower = searchTerm.toLowerCase()
     const matchesSearch =
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+      (item.name?.toLowerCase().includes(searchLower) || false) ||
+      (item.sku?.toLowerCase().includes(searchLower) || false)
     const matchesCategory = !categoryFilter || item.category === categoryFilter
     const isLowStock = item.quantity <= item.min_stock
     const isOutOfStock = item.quantity === 0
@@ -552,15 +566,15 @@ export default function Dashboard() {
         </div>
 
         {/* Items Table */}
-        <div className="pointer-events-auto w-full vellum-glass rounded-sm max-h-[400px] md:max-h-none overflow-y-auto mt-6 md:mt-0">
-            <div className="border-b border-neutral-200/60 px-4 py-3 flex flex-col md:flex-row md:justify-between md:items-center gap-3 sticky top-0 bg-[#FDFCF8]/95 backdrop-blur-sm">
+        <div className="pointer-events-auto w-full vellum-glass rounded-sm overflow-hidden mt-6 md:mt-0 flex flex-col">
+            <div className="border-b border-neutral-200/60 px-4 py-3 flex flex-col md:flex-row md:justify-between md:items-center gap-3 sticky top-0 bg-[#FDFCF8]/95 backdrop-blur-sm z-10">
             <span className="font-serif italic text-lg text-[#1C1917]">Inventory</span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search..."
+                  placeholder="Search name or SKU..."
                   className="px-3 py-2 text-xs border border-neutral-200 rounded-sm bg-white/50 font-mono w-full"
                 />
                 <select
@@ -588,9 +602,9 @@ export default function Dashboard() {
               </div>
             </div>
 
-          <div className="p-4 overflow-x-auto">
+          <div className="p-4 overflow-x-auto overflow-y-auto max-h-[600px]">
             <table className="w-full min-w-[480px] text-left">
-              <thead>
+              <thead className="sticky top-0 bg-[#FDFCF8]/95 backdrop-blur-sm z-10">
                 <tr className="border-b border-neutral-200/50">
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Item</th>
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">SKU</th>
@@ -607,7 +621,7 @@ export default function Dashboard() {
                     </td>
                   </tr>
                 ) : (
-                  filteredItems.map((item) => {
+                  filteredItems.slice(0, 50).map((item) => {
                     const isLowStock = item.quantity <= item.min_stock
                     const isOutOfStock = item.quantity === 0
 
@@ -668,25 +682,46 @@ export default function Dashboard() {
         {/* Outbound History */}
         <div className="relative z-20 pointer-events-auto mt-6 md:mt-8">
         <div className="vellum-glass rounded-sm border border-neutral-200/60 overflow-hidden shadow-lg">
-          <div className="border-b border-neutral-200/60 px-4 py-4 flex justify-between items-center bg-gradient-to-r from-red-50/50 to-orange-50/30">
+          <div className="border-b border-neutral-200/60 px-4 py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-gradient-to-r from-red-50/50 to-orange-50/30">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-red-100/50 rounded-sm border border-red-200/50">
                 <TrendingDown className="w-4 h-4 text-red-600" />
               </div>
               <span className="font-serif italic text-base md:text-lg text-[#1C1917]">Recently Moved Out</span>
             </div>
-            <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500 bg-white/50 px-2 py-1 rounded-sm">Last 10</span>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={outboundSearchTerm}
+                onChange={(e) => setOutboundSearchTerm(e.target.value)}
+                placeholder="Search name, SKU, shop..."
+                className="px-3 py-2 text-xs border border-neutral-200 rounded-sm bg-white/50 font-mono w-full md:w-auto min-w-[200px]"
+              />
+              <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500 bg-white/50 px-2 py-1 rounded-sm">Last 10</span>
+            </div>
           </div>
           <div className="divide-y divide-neutral-200/40 max-h-[300px] md:max-h-none overflow-y-auto">
-            {summary.recentTransactions.filter((tx: any) => tx.type === 'OUT').length === 0 ? (
-              <div className="px-4 py-8 text-center text-neutral-400 font-serif italic text-sm">
-                <TrendingDown className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No outbound history yet</p>
-              </div>
-            ) : (
-              summary.recentTransactions
-                .filter((tx: any) => tx.type === 'OUT')
-                .map((tx: any, index: number) => (
+            {(() => {
+              const outboundTransactions = summary.recentTransactions.filter((tx: any) => tx.type === 'OUT')
+              const filteredOutbound = outboundSearchTerm
+                ? outboundTransactions.filter((tx: any) => {
+                    const searchLower = outboundSearchTerm.toLowerCase()
+                    return (
+                      (tx.items?.name?.toLowerCase().includes(searchLower) || false) ||
+                      (tx.items?.sku?.toLowerCase().includes(searchLower) || false) ||
+                      (tx.shop?.toLowerCase().includes(searchLower) || false) ||
+                      (tx.notes?.toLowerCase().includes(searchLower) || false)
+                    )
+                  })
+                : outboundTransactions
+              
+              return filteredOutbound.length === 0 ? (
+                <div className="px-4 py-8 text-center text-neutral-400 font-serif italic text-sm">
+                  <TrendingDown className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p>{outboundSearchTerm ? 'No matching outbound transactions found' : 'No outbound history yet'}</p>
+                </div>
+              ) : (
+                filteredOutbound.map((tx: any, index: number) => (
                   <div key={tx.id} className="px-4 py-4 hover:bg-white/40 transition-colors group">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex gap-3 flex-1 min-w-0">
@@ -735,11 +770,19 @@ export default function Dashboard() {
                             year: 'numeric'
                           })}
                         </span>
+                        <button
+                          onClick={() => handleDeleteTransaction(tx.id, tx.items?.name || 'item', tx.quantity)}
+                          className="text-neutral-400 hover:text-red-600 transition-colors ml-2"
+                          title="Delete transaction and restore stock"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
                 ))
-            )}
+              )
+            })()}
           </div>
         </div>
 
@@ -831,7 +874,7 @@ export default function Dashboard() {
               {expiringItems.length} item{expiringItems.length !== 1 ? 's' : ''}
             </span>
           </div>
-          <div className="divide-y divide-neutral-200/40 max-h-[300px] md:max-h-none overflow-y-auto">
+          <div className="divide-y divide-neutral-200/40 max-h-[400px] overflow-y-auto">
             {expiringItems.length === 0 ? (
               <div className="px-4 py-8 text-center text-neutral-400 font-serif italic text-sm">
                 <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
