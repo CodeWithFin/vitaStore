@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import * as THREE from 'three'
@@ -57,6 +57,7 @@ export default function Dashboard() {
   const [editingItem, setEditingItem] = useState<any>(null)
   const [notification, setNotification] = useState<NotificationState | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [expandedItemId, setExpandedItemId] = useState<number | null>(null)
   
   const canvasRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<any>(null)
@@ -395,31 +396,8 @@ export default function Dashboard() {
 
   const categories = Array.from(new Set(items.map((item) => item.category).filter(Boolean)))
 
-  // Filter items expiring within a year
-  const oneYearFromNow = new Date()
-  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1)
-  
-  const expiringItems = items
-    .filter((item) => {
-      if (!item.expiry_date) return false
-      const expiryDate = new Date(item.expiry_date)
-      return expiryDate <= oneYearFromNow && expiryDate >= new Date()
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.expiry_date).getTime()
-      const dateB = new Date(b.expiry_date).getTime()
-      return dateA - dateB
-    })
 
-  const getDaysUntilExpiry = (expiryDate: string) => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const expiry = new Date(expiryDate)
-    expiry.setHours(0, 0, 0, 0)
-    const diffTime = expiry.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
+
 
   if (loading || !summary) {
     return (
@@ -484,6 +462,12 @@ export default function Dashboard() {
             >
               Stock Out
             </Link>
+            <Link
+              href="/expiring"
+              className="font-mono text-xs text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest"
+            >
+              Expiring
+            </Link>
             <button
               onClick={() => {
                 supabase.auth.signOut()
@@ -545,6 +529,13 @@ export default function Dashboard() {
               className="font-mono text-sm text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest border-b border-neutral-100 pb-2"
             >
               Stock Out
+            </Link>
+            <Link
+              href="/expiring"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="font-mono text-sm text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest border-b border-neutral-100 pb-2"
+            >
+              Expiring Items
             </Link>
           </div>
 
@@ -682,14 +673,14 @@ export default function Dashboard() {
             </div>
 
           <div className="p-4 overflow-x-auto overflow-y-auto max-h-[600px]">
-            <table className="w-full min-w-[480px] text-left">
+            <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-[#FDFCF8]/95 backdrop-blur-sm z-10">
                 <tr className="border-b border-neutral-200/50">
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Item</th>
-                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">SKU</th>
-                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Stock</th>
-                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Status</th>
-                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 text-right">Actions</th>
+                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 hidden md:table-cell">SKU</th>
+                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 hidden md:table-cell">Stock</th>
+                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 hidden md:table-cell">Status</th>
+                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 text-right hidden md:table-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -705,154 +696,130 @@ export default function Dashboard() {
                     const isOutOfStock = item.quantity === 0
 
                     return (
-                      <tr key={item.id} className="border-b border-neutral-200/30 hover:bg-white/30 transition-colors">
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <Package className="w-4 h-4 text-neutral-400" />
-                            <span className="font-serif text-sm text-[#1C1917]">{item.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-3">
-                          <span className="font-mono text-xs text-neutral-500">{item.sku}</span>
-                        </td>
-                        <td className="py-3">
-                          <span className="font-serif text-sm text-[#1C1917]">
-                            {item.quantity} {item.unit || 'pcs'}
-                          </span>
-                        </td>
-                        <td className="py-3">
-                          <span
-                            className={`font-mono text-[9px] uppercase tracking-widest px-2 py-1 rounded-sm ${
-                              isOutOfStock
-                                ? 'bg-red-100 text-red-800'
-                                : isLowStock
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-green-100 text-green-800'
-                            }`}
-                          >
-                            {isOutOfStock ? 'Out' : isLowStock ? 'Low' : 'OK'}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => openEditItem(item)}
-                              className="text-neutral-400 hover:text-[#1C1917] transition-colors"
+                      <React.Fragment key={item.id}>
+                        <tr 
+                          className="border-b border-neutral-200/30 hover:bg-white/30 transition-colors cursor-pointer md:cursor-default"
+                          onClick={() => {
+                            if (window.innerWidth < 768) {
+                              setExpandedItemId(expandedItemId === item.id ? null : item.id)
+                            }
+                          }}
+                        >
+                          <td className="py-3">
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <Package className="w-4 h-4 text-neutral-400" />
+                                <span className="font-serif text-sm text-[#1C1917]">{item.name}</span>
+                              </div>
+                              <div className="md:hidden pl-6">
+                                <span className="font-mono text-[10px] text-[#78350F]/70 uppercase tracking-widest">
+                                  {item.quantity} {item.unit || 'pcs'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 hidden md:table-cell">
+                            <span className="font-mono text-xs text-neutral-500">{item.sku}</span>
+                          </td>
+                          <td className="py-3 hidden md:table-cell">
+                            <span className="font-serif text-sm text-[#1C1917]">
+                              {item.quantity} {item.unit || 'pcs'}
+                            </span>
+                          </td>
+                          <td className="py-3 hidden md:table-cell">
+                            <span
+                              className={`font-mono text-[9px] uppercase tracking-widest px-2 py-1 rounded-sm ${
+                                isOutOfStock
+                                  ? 'bg-red-100 text-red-800'
+                                  : isLowStock
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}
                             >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleItemDelete(item.id)}
-                              className="text-neutral-400 hover:text-red-600 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                              {isOutOfStock ? 'Out' : isLowStock ? 'Low' : 'OK'}
+                            </span>
+                          </td>
+                          <td className="py-3 text-right hidden md:table-cell">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openEditItem(item)
+                                }}
+                                className="text-neutral-400 hover:text-[#1C1917] transition-colors"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleItemDelete(item.id)
+                                }}
+                                className="text-neutral-400 hover:text-red-600 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {/* Mobile Expanded Detail View */}
+                        {expandedItemId === item.id && (
+                          <tr className="md:hidden bg-neutral-50/50 border-b border-neutral-200/50">
+                            <td colSpan={2} className="px-4 py-4">
+                              <div className="grid grid-cols-2 gap-4 animate-fade-in">
+                                <div className="space-y-1">
+                                  <span className="block text-[9px] font-mono uppercase tracking-widest text-neutral-400">SKU</span>
+                                  <span className="block font-mono text-xs text-neutral-600">{item.sku || 'N/A'}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="block text-[9px] font-mono uppercase tracking-widest text-neutral-400">Category</span>
+                                  <span className="block font-serif text-xs text-neutral-600">{item.category || 'N/A'}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="block text-[9px] font-mono uppercase tracking-widest text-neutral-400">Price</span>
+                                  <span className="block font-mono text-xs text-neutral-600">${item.price || '0.00'}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="block text-[9px] font-mono uppercase tracking-widest text-neutral-400">Status</span>
+                                  <span
+                                    className={`inline-block font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-sm ${
+                                      isOutOfStock
+                                        ? 'bg-red-100 text-red-800'
+                                        : isLowStock
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-green-100 text-green-800'
+                                    }`}
+                                  >
+                                    {isOutOfStock ? 'Out' : isLowStock ? 'Low' : 'OK'}
+                                  </span>
+                                </div>
+                                <div className="col-span-2 pt-2 flex items-center gap-3 border-t border-neutral-200/40">
+                                  <button
+                                    onClick={() => openEditItem(item)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 rounded-sm text-xs font-mono uppercase tracking-widest text-neutral-600 hover:border-neutral-800 transition-colors"
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleItemDelete(item.id)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 rounded-sm text-xs font-mono uppercase tracking-widest text-red-400 hover:text-red-600 hover:border-red-200 transition-colors"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     )
                   })
                 )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Expiring Items Section */}
-        <div className="relative z-20 pointer-events-auto mt-6 md:mt-8">
-        <div className="vellum-glass rounded-sm border border-neutral-200/60 overflow-hidden shadow-lg">
-          <div className="border-b border-neutral-200/60 px-4 py-4 flex justify-between items-center bg-gradient-to-r from-orange-50/50 to-amber-50/30">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100/50 rounded-sm border border-orange-200/50">
-                <Clock className="w-4 h-4 text-orange-600" />
+                  </tbody>
+                </table>
               </div>
-              <span className="font-serif italic text-base md:text-lg text-[#1C1917]">Expiring Within a Year</span>
-            </div>
-            <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500 bg-white/50 px-2 py-1 rounded-sm">
-              {expiringItems.length} item{expiringItems.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <div className="divide-y divide-neutral-200/40 max-h-[400px] overflow-y-auto">
-            {expiringItems.length === 0 ? (
-              <div className="px-4 py-8 text-center text-neutral-400 font-serif italic text-sm">
-                <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No items expiring within a year</p>
-              </div>
-            ) : (
-              expiringItems.map((item: any) => {
-                const daysUntilExpiry = getDaysUntilExpiry(item.expiry_date)
-                const isExpiringSoon = daysUntilExpiry <= 30
-                const isExpiringVerySoon = daysUntilExpiry <= 7
-                
-                return (
-                  <div key={item.id} className="px-4 py-4 hover:bg-white/40 transition-colors group">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="flex gap-3 flex-1 min-w-0">
-                        <div className="flex-shrink-0 mt-1">
-                          <div className={`w-8 h-8 rounded-sm border flex items-center justify-center ${
-                            isExpiringVerySoon 
-                              ? 'bg-red-100/50 border-red-200/50' 
-                              : isExpiringSoon 
-                              ? 'bg-orange-100/50 border-orange-200/50' 
-                              : 'bg-amber-100/50 border-amber-200/50'
-                          }`}>
-                            <Clock className={`w-4 h-4 ${
-                              isExpiringVerySoon 
-                                ? 'text-red-600' 
-                                : isExpiringSoon 
-                                ? 'text-orange-600' 
-                                : 'text-amber-600'
-                            }`} />
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <div className="flex items-start gap-2">
-                            <Package className="w-3.5 h-3.5 text-neutral-400 mt-0.5 flex-shrink-0" />
-                            <span className="font-serif text-sm font-medium text-[#1C1917] truncate">{item.name}</span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="font-mono text-[10px] text-neutral-500">
-                              SKU: {item.sku || 'N/A'}
-                            </span>
-                            <span className="font-mono text-[10px] text-neutral-500">
-                              Stock: {item.quantity} {item.unit || 'pcs'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0 sm:ml-4">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-                          <span className="font-mono text-[10px] md:text-[11px] text-neutral-500 whitespace-nowrap">
-                            {new Date(item.expiry_date).toLocaleDateString('en-KE', { 
-                              day: 'numeric', 
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </span>
-                        </div>
-                        <span className={`font-mono text-[9px] md:text-[10px] font-semibold whitespace-nowrap ${
-                          isExpiringVerySoon 
-                            ? 'text-red-600' 
-                            : isExpiringSoon 
-                            ? 'text-orange-600' 
-                            : 'text-amber-600'
-                        }`}>
-                          {daysUntilExpiry === 0 
-                            ? 'Expires today' 
-                            : daysUntilExpiry === 1 
-                            ? 'Expires tomorrow' 
-                            : `${daysUntilExpiry} days left`}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-
         </div>
 
         {/* Footer */}
