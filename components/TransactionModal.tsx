@@ -143,7 +143,9 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
     setShowItemDropdown(false)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (transactionItems.length === 0) {
       alert('Please add at least one item')
@@ -154,12 +156,17 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
       return
     }
     
-    onSave({
-      items: transactionItems,
-      shop: type === 'OUT' ? shop : undefined,
-      notes: globalNotes,
-      transaction_date: transactionDate || undefined,
-    })
+    setIsLoading(true)
+    try {
+      await onSave({
+        items: transactionItems,
+        shop: type === 'OUT' ? shop : undefined,
+        notes: globalNotes,
+        transaction_date: transactionDate || undefined,
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const availableItems = items.filter((item) => !transactionItems.some((ti) => ti.item_id === item.id))
@@ -466,10 +473,17 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
           <div className="flex gap-3 mt-6 pb-2 flex-shrink-0 sticky bottom-0 bg-[#FDFCF8]/95 backdrop-blur-sm pt-4 border-t border-neutral-200/30 -mx-4 md:-mx-8 px-4 md:px-8 max-w-full overflow-x-hidden min-w-0">
             <button
               type="submit"
-              disabled={transactionItems.length === 0}
-              className="flex-1 bg-ink text-paper px-4 md:px-6 py-3 rounded-sm font-mono text-xs tracking-widest uppercase hover:bg-sepia transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-0 truncate"
+              disabled={transactionItems.length === 0 || isLoading}
+              className="flex-1 bg-ink text-paper px-4 md:px-6 py-3 rounded-sm font-mono text-xs tracking-widest uppercase hover:bg-sepia transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-0 truncate flex items-center justify-center gap-2"
             >
-              Process {transactionItems.length > 0 ? `(${transactionItems.length})` : ''}
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-paper/30 border-t-paper rounded-full animate-spin"></div>
+                  <span>Processing...</span>
+                </>
+              ) : (
+                `Process ${transactionItems.length > 0 ? `(${transactionItems.length})` : ''}`
+              )}
             </button>
             <button
               type="button"
