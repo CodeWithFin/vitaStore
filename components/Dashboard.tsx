@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import * as THREE from 'three'
@@ -57,6 +57,7 @@ export default function Dashboard() {
   const [editingItem, setEditingItem] = useState<any>(null)
   const [notification, setNotification] = useState<NotificationState | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [expandedItemId, setExpandedItemId] = useState<number | null>(null)
   
   const canvasRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<any>(null)
@@ -686,10 +687,10 @@ export default function Dashboard() {
               <thead className="sticky top-0 bg-[#FDFCF8]/95 backdrop-blur-sm z-10">
                 <tr className="border-b border-neutral-200/50">
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Item</th>
-                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">SKU</th>
+                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 hidden md:table-cell">SKU</th>
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Stock</th>
-                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Status</th>
-                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 text-right">Actions</th>
+                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 hidden md:table-cell">Status</th>
+                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 text-right hidden md:table-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -705,57 +706,123 @@ export default function Dashboard() {
                     const isOutOfStock = item.quantity === 0
 
                     return (
-                      <tr key={item.id} className="border-b border-neutral-200/30 hover:bg-white/30 transition-colors">
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <Package className="w-4 h-4 text-neutral-400" />
-                            <span className="font-serif text-sm text-[#1C1917]">{item.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-3">
-                          <span className="font-mono text-xs text-neutral-500">{item.sku}</span>
-                        </td>
-                        <td className="py-3">
-                          <span className="font-serif text-sm text-[#1C1917]">
-                            {item.quantity} {item.unit || 'pcs'}
-                          </span>
-                        </td>
-                        <td className="py-3">
-                          <span
-                            className={`font-mono text-[9px] uppercase tracking-widest px-2 py-1 rounded-sm ${
-                              isOutOfStock
-                                ? 'bg-red-100 text-red-800'
-                                : isLowStock
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-green-100 text-green-800'
-                            }`}
-                          >
-                            {isOutOfStock ? 'Out' : isLowStock ? 'Low' : 'OK'}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => openEditItem(item)}
-                              className="text-neutral-400 hover:text-[#1C1917] transition-colors"
+                      <React.Fragment key={item.id}>
+                        <tr 
+                          className="border-b border-neutral-200/30 hover:bg-white/30 transition-colors cursor-pointer md:cursor-default"
+                          onClick={() => {
+                            if (window.innerWidth < 768) {
+                              setExpandedItemId(expandedItemId === item.id ? null : item.id)
+                            }
+                          }}
+                        >
+                          <td className="py-3">
+                            <div className="flex items-center gap-2">
+                              <Package className="w-4 h-4 text-neutral-400" />
+                              <span className="font-serif text-sm text-[#1C1917]">{item.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 hidden md:table-cell">
+                            <span className="font-mono text-xs text-neutral-500">{item.sku}</span>
+                          </td>
+                          <td className="py-3">
+                            <span className="font-serif text-sm text-[#1C1917]">
+                              {item.quantity} {item.unit || 'pcs'}
+                            </span>
+                          </td>
+                          <td className="py-3 hidden md:table-cell">
+                            <span
+                              className={`font-mono text-[9px] uppercase tracking-widest px-2 py-1 rounded-sm ${
+                                isOutOfStock
+                                  ? 'bg-red-100 text-red-800'
+                                  : isLowStock
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-green-100 text-green-800'
+                              }`}
                             >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleItemDelete(item.id)}
-                              className="text-neutral-400 hover:text-red-600 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                              {isOutOfStock ? 'Out' : isLowStock ? 'Low' : 'OK'}
+                            </span>
+                          </td>
+                          <td className="py-3 text-right hidden md:table-cell">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openEditItem(item)
+                                }}
+                                className="text-neutral-400 hover:text-[#1C1917] transition-colors"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleItemDelete(item.id)
+                                }}
+                                className="text-neutral-400 hover:text-red-600 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {/* Mobile Expanded Detail View */}
+                        {expandedItemId === item.id && (
+                          <tr className="md:hidden bg-neutral-50/50 border-b border-neutral-200/50">
+                            <td colSpan={2} className="px-4 py-4">
+                              <div className="grid grid-cols-2 gap-4 animate-fade-in">
+                                <div className="space-y-1">
+                                  <span className="block text-[9px] font-mono uppercase tracking-widest text-neutral-400">SKU</span>
+                                  <span className="block font-mono text-xs text-neutral-600">{item.sku || 'N/A'}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="block text-[9px] font-mono uppercase tracking-widest text-neutral-400">Category</span>
+                                  <span className="block font-serif text-xs text-neutral-600">{item.category || 'N/A'}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="block text-[9px] font-mono uppercase tracking-widest text-neutral-400">Price</span>
+                                  <span className="block font-mono text-xs text-neutral-600">${item.price || '0.00'}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="block text-[9px] font-mono uppercase tracking-widest text-neutral-400">Status</span>
+                                  <span
+                                    className={`inline-block font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-sm ${
+                                      isOutOfStock
+                                        ? 'bg-red-100 text-red-800'
+                                        : isLowStock
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-green-100 text-green-800'
+                                    }`}
+                                  >
+                                    {isOutOfStock ? 'Out' : isLowStock ? 'Low' : 'OK'}
+                                  </span>
+                                </div>
+                                <div className="col-span-2 pt-2 flex items-center gap-3 border-t border-neutral-200/40">
+                                  <button
+                                    onClick={() => openEditItem(item)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 rounded-sm text-xs font-mono uppercase tracking-widest text-neutral-600 hover:border-neutral-800 transition-colors"
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleItemDelete(item.id)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 rounded-sm text-xs font-mono uppercase tracking-widest text-red-400 hover:text-red-600 hover:border-red-200 transition-colors"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     )
                   })
                 )}
-              </tbody>
-            </table>
-          </div>
+                  </tbody>
+                </table>
+              </div>
         </div>
 
         {/* Expiring Items Section */}
