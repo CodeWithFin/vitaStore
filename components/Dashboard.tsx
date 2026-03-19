@@ -18,6 +18,8 @@ import {
   Calendar,
   FileText,
   Clock,
+  Menu,
+  X,
 } from 'lucide-react'
 import {
   getDashboardSummary,
@@ -54,6 +56,7 @@ export default function Dashboard() {
   const [transactionType, setTransactionType] = useState<'IN' | 'OUT' | null>(null)
   const [editingItem, setEditingItem] = useState<any>(null)
   const [notification, setNotification] = useState<NotificationState | null>(null)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
   const canvasRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<any>(null)
@@ -447,7 +450,7 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="relative z-20 pointer-events-none flex flex-col gap-6 md:gap-8 p-4 md:p-12 min-h-screen">
         {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 animate-fade-in pointer-events-auto" style={{ animationDelay: '0.1s' }}>
+        <header className="flex flex-row items-center justify-between gap-4 animate-fade-in pointer-events-auto" style={{ animationDelay: '0.1s' }}>
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 border border-neutral-800 flex items-center justify-center rounded-sm bg-[#FDFCF8] relative overflow-hidden">
@@ -462,7 +465,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <nav className="flex flex-wrap items-center gap-3 md:gap-8">
+          <nav className="hidden md:flex flex-wrap items-center gap-3 md:gap-8">
             <Link
               href="/items/new"
               className="font-mono text-xs text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest"
@@ -491,7 +494,73 @@ export default function Dashboard() {
               Logout
             </button>
           </nav>
+
+          {/* Mobile Hamburger Button */}
+          <button 
+            className="md:hidden p-2 text-neutral-500 hover:text-[#1C1917] transition-colors"
+            onClick={() => setIsMobileMenuOpen(true)}
+          >
+            <Menu className="w-6 h-6" />
+          </button>
         </header>
+
+        {/* Mobile Sidebar Overlay */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[100] md:hidden animate-fade-in pointer-events-auto"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Mobile Sidebar */}
+        <div className={`fixed top-0 right-0 h-full w-[280px] bg-[#FDFCF8] z-[101] shadow-2xl transform transition-transform duration-300 md:hidden flex flex-col pointer-events-auto ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="p-6 border-b border-neutral-200 flex justify-between items-center">
+            <span className="font-serif italic text-lg text-[#1C1917]">Navigation</span>
+            <button 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-neutral-400 hover:text-[#1C1917] transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          
+          <div className="flex-1 p-6 flex flex-col gap-6">
+            <Link
+              href="/items/new"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="font-mono text-sm text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest border-b border-neutral-100 pb-2"
+            >
+              Add Item
+            </Link>
+            <Link
+              href="/stock-in"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="font-mono text-sm text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest border-b border-neutral-100 pb-2"
+            >
+              Stock In
+            </Link>
+            <Link
+              href="/stock-out"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="font-mono text-sm text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest border-b border-neutral-100 pb-2"
+            >
+              Stock Out
+            </Link>
+          </div>
+
+          <div className="p-6 border-t border-neutral-200">
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false)
+                supabase.auth.signOut()
+                router.push('/login')
+              }}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#1C1917] text-[#FDFCF8] hover:bg-[#2C2927] transition-colors rounded-sm font-mono text-xs uppercase tracking-widest"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
 
         {/* Stats Section */}
         <div className="relative z-10 w-full max-w-4xl animate-fade-in opacity-0 pointer-events-auto mt-6 md:mt-0" style={{ animationDelay: '0.3s' }}>
