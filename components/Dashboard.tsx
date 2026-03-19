@@ -55,6 +55,7 @@ export default function Dashboard() {
   const [showTransactionModal, setShowTransactionModal] = useState(false)
   const [transactionType, setTransactionType] = useState<'IN' | 'OUT' | null>(null)
   const [editingItem, setEditingItem] = useState<any>(null)
+  const [notification, setNotification] = useState<NotificationState | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
   const canvasRef = useRef<HTMLDivElement>(null)
