@@ -396,31 +396,8 @@ export default function Dashboard() {
 
   const categories = Array.from(new Set(items.map((item) => item.category).filter(Boolean)))
 
-  // Filter items expiring within a year
-  const oneYearFromNow = new Date()
-  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1)
-  
-  const expiringItems = items
-    .filter((item) => {
-      if (!item.expiry_date) return false
-      const expiryDate = new Date(item.expiry_date)
-      return expiryDate <= oneYearFromNow && expiryDate >= new Date()
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.expiry_date).getTime()
-      const dateB = new Date(b.expiry_date).getTime()
-      return dateA - dateB
-    })
 
-  const getDaysUntilExpiry = (expiryDate: string) => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const expiry = new Date(expiryDate)
-    expiry.setHours(0, 0, 0, 0)
-    const diffTime = expiry.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
+
 
   if (loading || !summary) {
     return (
@@ -485,6 +462,12 @@ export default function Dashboard() {
             >
               Stock Out
             </Link>
+            <Link
+              href="/expiring"
+              className="font-mono text-xs text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest"
+            >
+              Expiring
+            </Link>
             <button
               onClick={() => {
                 supabase.auth.signOut()
@@ -546,6 +529,13 @@ export default function Dashboard() {
               className="font-mono text-sm text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest border-b border-neutral-100 pb-2"
             >
               Stock Out
+            </Link>
+            <Link
+              href="/expiring"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="font-mono text-sm text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest border-b border-neutral-100 pb-2"
+            >
+              Expiring Items
             </Link>
           </div>
 
@@ -830,103 +820,6 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </div>
-        </div>
-
-        {/* Expiring Items Section */}
-        <div className="relative z-20 pointer-events-auto mt-6 md:mt-8">
-        <div className="vellum-glass rounded-sm border border-neutral-200/60 overflow-hidden shadow-lg">
-          <div className="border-b border-neutral-200/60 px-4 py-4 flex justify-between items-center bg-gradient-to-r from-orange-50/50 to-amber-50/30">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100/50 rounded-sm border border-orange-200/50">
-                <Clock className="w-4 h-4 text-orange-600" />
-              </div>
-              <span className="font-serif italic text-base md:text-lg text-[#1C1917]">Expiring Within a Year</span>
-            </div>
-            <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500 bg-white/50 px-2 py-1 rounded-sm">
-              {expiringItems.length} item{expiringItems.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <div className="divide-y divide-neutral-200/40 max-h-[400px] overflow-y-auto">
-            {expiringItems.length === 0 ? (
-              <div className="px-4 py-8 text-center text-neutral-400 font-serif italic text-sm">
-                <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No items expiring within a year</p>
-              </div>
-            ) : (
-              expiringItems.map((item: any) => {
-                const daysUntilExpiry = getDaysUntilExpiry(item.expiry_date)
-                const isExpiringSoon = daysUntilExpiry <= 30
-                const isExpiringVerySoon = daysUntilExpiry <= 7
-                
-                return (
-                  <div key={item.id} className="px-4 py-4 hover:bg-white/40 transition-colors group">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="flex gap-3 flex-1 min-w-0">
-                        <div className="flex-shrink-0 mt-1">
-                          <div className={`w-8 h-8 rounded-sm border flex items-center justify-center ${
-                            isExpiringVerySoon 
-                              ? 'bg-red-100/50 border-red-200/50' 
-                              : isExpiringSoon 
-                              ? 'bg-orange-100/50 border-orange-200/50' 
-                              : 'bg-amber-100/50 border-amber-200/50'
-                          }`}>
-                            <Clock className={`w-4 h-4 ${
-                              isExpiringVerySoon 
-                                ? 'text-red-600' 
-                                : isExpiringSoon 
-                                ? 'text-orange-600' 
-                                : 'text-amber-600'
-                            }`} />
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <div className="flex items-start gap-2">
-                            <Package className="w-3.5 h-3.5 text-neutral-400 mt-0.5 flex-shrink-0" />
-                            <span className="font-serif text-sm font-medium text-[#1C1917] truncate">{item.name}</span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="font-mono text-[10px] text-neutral-500">
-                              SKU: {item.sku || 'N/A'}
-                            </span>
-                            <span className="font-mono text-[10px] text-neutral-500">
-                              Stock: {item.quantity} {item.unit || 'pcs'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0 sm:ml-4">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-                          <span className="font-mono text-[10px] md:text-[11px] text-neutral-500 whitespace-nowrap">
-                            {new Date(item.expiry_date).toLocaleDateString('en-KE', { 
-                              day: 'numeric', 
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </span>
-                        </div>
-                        <span className={`font-mono text-[9px] md:text-[10px] font-semibold whitespace-nowrap ${
-                          isExpiringVerySoon 
-                            ? 'text-red-600' 
-                            : isExpiringSoon 
-                            ? 'text-orange-600' 
-                            : 'text-amber-600'
-                        }`}>
-                          {daysUntilExpiry === 0 
-                            ? 'Expires today' 
-                            : daysUntilExpiry === 1 
-                            ? 'Expires tomorrow' 
-                            : `${daysUntilExpiry} days left`}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </div>
-
         </div>
 
         {/* Footer */}
