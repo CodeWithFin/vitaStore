@@ -683,7 +683,7 @@ export default function Dashboard() {
             </div>
 
           <div className="p-4 overflow-x-auto overflow-y-auto max-h-[600px]">
-            <table className="w-full min-w-[480px] text-left">
+            <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-[#FDFCF8]/95 backdrop-blur-sm z-10">
                 <tr className="border-b border-neutral-200/50">
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Item</th>
