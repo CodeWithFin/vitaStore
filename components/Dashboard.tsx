@@ -688,7 +688,7 @@ export default function Dashboard() {
                 <tr className="border-b border-neutral-200/50">
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Item</th>
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 hidden md:table-cell">SKU</th>
-                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500">Stock</th>
+                  <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 hidden md:table-cell">Stock</th>
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 hidden md:table-cell">Status</th>
                   <th className="pb-2 text-[10px] font-mono uppercase tracking-widest text-neutral-500 text-right hidden md:table-cell">Actions</th>
                 </tr>
@@ -716,15 +716,22 @@ export default function Dashboard() {
                           }}
                         >
                           <td className="py-3">
-                            <div className="flex items-center gap-2">
-                              <Package className="w-4 h-4 text-neutral-400" />
-                              <span className="font-serif text-sm text-[#1C1917]">{item.name}</span>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <Package className="w-4 h-4 text-neutral-400" />
+                                <span className="font-serif text-sm text-[#1C1917]">{item.name}</span>
+                              </div>
+                              <div className="md:hidden pl-6">
+                                <span className="font-mono text-[10px] text-[#78350F]/70 uppercase tracking-widest">
+                                  {item.quantity} {item.unit || 'pcs'}
+                                </span>
+                              </div>
                             </div>
                           </td>
                           <td className="py-3 hidden md:table-cell">
                             <span className="font-mono text-xs text-neutral-500">{item.sku}</span>
                           </td>
-                          <td className="py-3">
+                          <td className="py-3 hidden md:table-cell">
                             <span className="font-serif text-sm text-[#1C1917]">
                               {item.quantity} {item.unit || 'pcs'}
                             </span>
