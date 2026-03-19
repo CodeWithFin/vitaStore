@@ -4,6 +4,9 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'VitaStore Inventory',
   description: 'Inventory Management System',
+  icons: {
+    icon: '/assets/icons/vimeo.png',
+  },
 }
 
 export default function RootLayout({
