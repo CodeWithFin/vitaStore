@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import * as THREE from 'three'
 import {
@@ -462,21 +463,24 @@ export default function Dashboard() {
           </div>
 
           <nav className="flex flex-wrap items-center gap-3 md:gap-8">
-            <button
-              onClick={() => {
-                setEditingItem(null)
-                setShowItemModal(true)
-              }}
+            <Link
+              href="/items/new"
               className="font-mono text-xs text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest"
             >
               Add Item
-            </button>
-            <button
-              onClick={openStockIn}
+            </Link>
+            <Link
+              href="/stock-in"
               className="font-mono text-xs text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest"
             >
               Stock In
-            </button>
+            </Link>
+            <Link
+              href="/stock-out"
+              className="font-mono text-xs text-neutral-500 hover:text-[#1C1917] transition-colors uppercase tracking-widest"
+            >
+              Stock Out
+            </Link>
             <button
               onClick={() => {
                 supabase.auth.signOut()
@@ -538,30 +542,36 @@ export default function Dashboard() {
           </div>
 
           <div className="p-5 space-y-4">
-            <button
-              onClick={openStockIn}
+            <Link
+              href="/stock-in"
               className="w-full flex items-center gap-3 p-3 rounded-sm bg-white/50 hover:bg-white/80 transition-colors border border-neutral-200/50"
             >
               <ArrowDownCircle className="w-4 h-4 text-[#1C1917]" />
-              <span className="font-mono text-xs tracking-widest uppercase text-neutral-600">Stock In</span>
-            </button>
-            <button
-              onClick={openStockOut}
+              <div className="flex flex-col items-start">
+                <span className="font-mono text-xs tracking-widest uppercase text-neutral-800">Stock In</span>
+                <span className="font-mono text-[9px] text-neutral-400">View History & Add Stock</span>
+              </div>
+            </Link>
+            <Link
+              href="/stock-out"
               className="w-full flex items-center gap-3 p-3 rounded-sm bg-white/50 hover:bg-white/80 transition-colors border border-neutral-200/50"
             >
               <ArrowUpCircle className="w-4 h-4 text-[#1C1917]" />
-              <span className="font-mono text-xs tracking-widest uppercase text-neutral-600">Stock Out</span>
-            </button>
-            <button
-              onClick={() => {
-                setEditingItem(null)
-                setShowItemModal(true)
-              }}
+              <div className="flex flex-col items-start">
+                <span className="font-mono text-xs tracking-widest uppercase text-neutral-800">Stock Out</span>
+                <span className="font-mono text-[9px] text-neutral-400">View History & Move Out</span>
+              </div>
+            </Link>
+            <Link
+              href="/items/new"
               className="w-full flex items-center gap-3 p-3 rounded-sm bg-white/50 hover:bg-white/80 transition-colors border border-neutral-200/50"
             >
               <Plus className="w-4 h-4 text-[#1C1917]" />
-              <span className="font-mono text-xs tracking-widest uppercase text-neutral-600">Add Item</span>
-            </button>
+              <div className="flex flex-col items-start">
+                <span className="font-mono text-xs tracking-widest uppercase text-neutral-800">Add Items</span>
+                <span className="font-mono text-[9px] text-neutral-400">Batch add multiple products</span>
+              </div>
+            </Link>
           </div>
         </div>
 
@@ -677,187 +687,6 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
-        </div>
-
-        {/* Outbound History */}
-        <div className="relative z-20 pointer-events-auto mt-6 md:mt-8">
-        <div className="vellum-glass rounded-sm border border-neutral-200/60 overflow-hidden shadow-lg">
-          <div className="border-b border-neutral-200/60 px-4 py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3 bg-gradient-to-r from-red-50/50 to-orange-50/30">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100/50 rounded-sm border border-red-200/50">
-                <TrendingDown className="w-4 h-4 text-red-600" />
-              </div>
-              <span className="font-serif italic text-base md:text-lg text-[#1C1917]">Recently Moved Out</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="text"
-                value={outboundSearchTerm}
-                onChange={(e) => setOutboundSearchTerm(e.target.value)}
-                placeholder="Search name, SKU, shop..."
-                className="px-3 py-2 text-xs border border-neutral-200 rounded-sm bg-white/50 font-mono w-full md:w-auto min-w-[200px]"
-              />
-              <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500 bg-white/50 px-2 py-1 rounded-sm">Last 10</span>
-            </div>
-          </div>
-          <div className="divide-y divide-neutral-200/40 max-h-[300px] md:max-h-none overflow-y-auto">
-            {(() => {
-              const outboundTransactions = summary.recentTransactions.filter((tx: any) => tx.type === 'OUT')
-              const filteredOutbound = outboundSearchTerm
-                ? outboundTransactions.filter((tx: any) => {
-                    const searchLower = outboundSearchTerm.toLowerCase()
-                    return (
-                      (tx.items?.name?.toLowerCase().includes(searchLower) || false) ||
-                      (tx.items?.sku?.toLowerCase().includes(searchLower) || false) ||
-                      (tx.shop?.toLowerCase().includes(searchLower) || false) ||
-                      (tx.notes?.toLowerCase().includes(searchLower) || false)
-                    )
-                  })
-                : outboundTransactions
-              
-              return filteredOutbound.length === 0 ? (
-                <div className="px-4 py-8 text-center text-neutral-400 font-serif italic text-sm">
-                  <TrendingDown className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p>{outboundSearchTerm ? 'No matching outbound transactions found' : 'No outbound history yet'}</p>
-                </div>
-              ) : (
-                filteredOutbound.map((tx: any, index: number) => (
-                  <div key={tx.id} className="px-4 py-4 hover:bg-white/40 transition-colors group">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="flex gap-3 flex-1 min-w-0">
-                        <div className="flex-shrink-0 mt-1">
-                          <div className="w-8 h-8 rounded-sm bg-red-100/50 border border-red-200/50 flex items-center justify-center">
-                            <ArrowUpCircle className="w-4 h-4 text-red-600" />
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <div className="flex items-start gap-2">
-                            <Package className="w-3.5 h-3.5 text-neutral-400 mt-0.5 flex-shrink-0" />
-                            <span className="font-serif text-sm font-medium text-[#1C1917] truncate">{tx.items?.name || 'Unknown item'}</span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-600 bg-neutral-100/50 px-2 py-0.5 rounded-sm">
-                              {tx.quantity} {tx.items?.unit || 'pcs'}
-                            </span>
-                            <span className="font-mono text-[10px] text-neutral-500">
-                              SKU: {tx.items?.sku || 'N/A'}
-                            </span>
-                          </div>
-                          {tx.shop && (
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <MapPin className="w-3 h-3 text-[#78350F]" />
-                              <span className="font-serif text-xs text-[#78350F] font-medium">
-                                {tx.shop}
-                              </span>
-                            </div>
-                          )}
-                          {tx.notes && (
-                            <div className="flex items-start gap-1.5 mt-1">
-                              <FileText className="w-3 h-3 text-neutral-400 mt-0.5 flex-shrink-0" />
-                              <span className="font-serif text-[11px] text-neutral-500 italic truncate">
-                                {tx.notes}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 sm:ml-4">
-                        <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-                        <span className="font-mono text-[10px] md:text-[11px] text-neutral-500 whitespace-nowrap">
-                          {new Date(tx.transaction_date || tx.created_at).toLocaleDateString('en-KE', { 
-                            day: 'numeric', 
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </span>
-                        <button
-                          onClick={() => handleDeleteTransaction(tx.id, tx.items?.name || 'item', tx.quantity)}
-                          className="text-neutral-400 hover:text-red-600 transition-colors ml-2"
-                          title="Delete transaction and restore stock"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )
-            })()}
-          </div>
-        </div>
-
-        </div>
-
-        {/* Inbound History */}
-        <div className="relative z-20 pointer-events-auto mt-6 md:mt-8">
-        <div className="vellum-glass rounded-sm border border-neutral-200/60 overflow-hidden shadow-lg">
-          <div className="border-b border-neutral-200/60 px-4 py-4 flex justify-between items-center bg-gradient-to-r from-green-50/50 to-emerald-50/30">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100/50 rounded-sm border border-green-200/50">
-                <TrendingUp className="w-4 h-4 text-green-600" />
-              </div>
-              <span className="font-serif italic text-base md:text-lg text-[#1C1917]">Recently Stocked In</span>
-            </div>
-            <span className="font-mono text-[9px] md:text-[10px] uppercase tracking-widest text-neutral-500 bg-white/50 px-2 py-1 rounded-sm">Last 10</span>
-          </div>
-          <div className="divide-y divide-neutral-200/40 max-h-[300px] md:max-h-none overflow-y-auto">
-            {summary.recentTransactions.filter((tx: any) => tx.type === 'IN').length === 0 ? (
-              <div className="px-4 py-8 text-center text-neutral-400 font-serif italic text-sm">
-                <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No inbound history yet</p>
-              </div>
-            ) : (
-              summary.recentTransactions
-                .filter((tx: any) => tx.type === 'IN')
-                .map((tx: any, index: number) => (
-                  <div key={tx.id} className="px-4 py-4 hover:bg-white/40 transition-colors group">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                      <div className="flex gap-3 flex-1 min-w-0">
-                        <div className="flex-shrink-0 mt-1">
-                          <div className="w-8 h-8 rounded-sm bg-green-100/50 border border-green-200/50 flex items-center justify-center">
-                            <ArrowDownCircle className="w-4 h-4 text-green-600" />
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <div className="flex items-start gap-2">
-                            <Package className="w-3.5 h-3.5 text-neutral-400 mt-0.5 flex-shrink-0" />
-                            <span className="font-serif text-sm font-medium text-[#1C1917] truncate">{tx.items?.name || 'Unknown item'}</span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span className="font-mono text-[10px] uppercase tracking-wider text-green-700 bg-green-100/50 px-2 py-0.5 rounded-sm font-semibold">
-                              +{tx.quantity} {tx.items?.unit || 'pcs'}
-                            </span>
-                            <span className="font-mono text-[10px] text-neutral-500">
-                              SKU: {tx.items?.sku || 'N/A'}
-                            </span>
-                          </div>
-                          {tx.notes && (
-                            <div className="flex items-start gap-1.5 mt-1">
-                              <FileText className="w-3 h-3 text-neutral-400 mt-0.5 flex-shrink-0" />
-                              <span className="font-serif text-[11px] text-neutral-500 italic truncate">
-                                {tx.notes}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 sm:ml-4">
-                        <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-                        <span className="font-mono text-[10px] md:text-[11px] text-neutral-500 whitespace-nowrap">
-                          {new Date(tx.transaction_date || tx.created_at).toLocaleDateString('en-KE', { 
-                            day: 'numeric', 
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-            )}
-          </div>
-        </div>
-
         </div>
 
         {/* Expiring Items Section */}

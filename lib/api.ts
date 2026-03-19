@@ -30,6 +30,12 @@ export const createItem = async (item: any) => {
   return data
 }
 
+export const createItems = async (items: any[]) => {
+  const { data, error } = await supabase.from('items').insert(items).select()
+  if (error) throw error
+  return data
+}
+
 export const updateItem = async (id: number, item: any) => {
   const { data, error } = await supabase
     .from('items')
@@ -196,47 +202,64 @@ export const stockInMultiple = async (
   globalNotes?: string,
   transactionDate?: string
 ) => {
-  // Get all item details for email
+  // 1. Prepare transactions for batch insert
+  const transactionsToInsert = items.map(data => ({
+    item_id: data.item_id,
+    type: 'IN',
+    quantity: data.quantity,
+    notes: data.notes || globalNotes || '',
+    transaction_date: transactionDate || null,
+  }))
+
+  // 2. Batch insert transactions
+  const { error: batchTransError } = await supabase
+    .from('transactions')
+    .insert(transactionsToInsert)
+
+  if (batchTransError) throw batchTransError
+
+  // 3. Group and sum quantities by item_id to minimize database calls and avoid race conditions
+  const totalsByItem = items.reduce((acc, current) => {
+    acc[current.item_id] = (acc[current.item_id] || 0) + current.quantity
+    return acc
+  }, {} as Record<number, number>)
+
+  // 4. Update item quantities sequentially to ensure accuracy
   const itemDetails: any[] = []
-  
-  // Process all items
-  for (const data of items) {
-    const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', data.item_id).single()
-    if (!item) throw new Error(`Item not found: ${data.item_id}`)
-
-    const { error: transError } = await supabase.from('transactions').insert({
-      item_id: data.item_id,
-      type: 'IN',
-      quantity: data.quantity,
-      notes: data.notes || globalNotes || '',
-      transaction_date: transactionDate || null,
-    })
-
-    if (transError) throw transError
+  for (const [itemIdStr, totalQuantity] of Object.entries(totalsByItem)) {
+    const itemId = parseInt(itemIdStr)
+    
+    // Get current item details
+    const { data: item, error: fetchError } = await supabase
+      .from('items')
+      .select('name, sku, unit, quantity')
+      .eq('id', itemId)
+      .single()
+    
+    if (fetchError || !item) throw new Error(`Item not found: ${itemId}`)
 
     // Update item quantity
     const { error: updateError } = await supabase
       .from('items')
       .update({ 
-        quantity: item.quantity + data.quantity,
+        quantity: item.quantity + totalQuantity,
         updated_at: new Date().toISOString()
       })
-      .eq('id', data.item_id)
+      .eq('id', itemId)
 
     if (updateError) throw updateError
 
     itemDetails.push({
       ...item,
-      transactionQuantity: data.quantity,
-      transactionNotes: data.notes || globalNotes,
+      transactionQuantity: totalQuantity,
+      transactionNotes: globalNotes,
     })
   }
 
-  // Send email notification with all items (non-blocking)
+  // 5. Send email notification (non-blocking)
   if (itemDetails.length > 0) {
     try {
       const { sendEmail, formatStockInEmailMultiple } = await import('./email')
-      
       const { subject, html } = formatStockInEmailMultiple(itemDetails)
       
       sendEmail({
@@ -259,49 +282,61 @@ export const stockOutMultiple = async (
   globalNotes?: string,
   transactionDate?: string
 ) => {
-  // First, validate all items have sufficient stock
-  for (const data of items) {
-    const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', data.item_id).single()
-    if (!item) throw new Error(`Item not found: ${data.item_id}`)
-    if (item.quantity < data.quantity) {
-      throw new Error(`Insufficient stock for ${item.name}. Available: ${item.quantity}`)
+  // 1. Group and sum quantities by item_id
+  const totalsByItem = items.reduce((acc, current) => {
+    acc[current.item_id] = (acc[current.item_id] || 0) + current.quantity
+    return acc
+  }, {} as Record<number, number>)
+
+  // 2. Validate all items have sufficient stock (sequentially to be safe)
+  const validatedItems: any[] = []
+  for (const [itemIdStr, totalQuantity] of Object.entries(totalsByItem)) {
+    const itemId = parseInt(itemIdStr)
+    const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', itemId).single()
+    if (!item) throw new Error(`Item not found: ${itemId}`)
+    if (item.quantity < totalQuantity) {
+      throw new Error(`Insufficient stock for ${item.name}. Available: ${item.quantity}, Requested: ${totalQuantity}`)
     }
+    validatedItems.push({ ...item, id: itemId, transactionTotal: totalQuantity })
   }
-
-  // Get all item details for email
-  const itemDetails: any[] = []
   
-  // Process all items
-  for (const data of items) {
-    const { data: item } = await supabase.from('items').select('name, sku, unit, quantity').eq('id', data.item_id).single()
-    if (!item) throw new Error(`Item not found: ${data.item_id}`)
+  // 3. Prepare transactions for batch insert
+  const transactionsToInsert = items.map(data => ({
+    item_id: data.item_id,
+    type: 'OUT',
+    quantity: data.quantity,
+    notes: data.notes || globalNotes || '',
+    shop: shop || null,
+    transaction_date: transactionDate || null,
+  }))
 
-    const { error: transError } = await supabase.from('transactions').insert({
-      item_id: data.item_id,
-      type: 'OUT',
-      quantity: data.quantity,
-      notes: data.notes || globalNotes || '',
-      shop: shop || null,
-      transaction_date: transactionDate || null,
-    })
+  // 4. Batch insert transactions
+  const { error: batchTransError } = await supabase
+    .from('transactions')
+    .insert(transactionsToInsert)
 
-    if (transError) throw transError
+  if (batchTransError) throw batchTransError
 
-    // Update item quantity
+  // 5. Update item quantities sequentially
+  const itemDetails: any[] = []
+  for (const item of validatedItems) {
     const { error: updateError } = await supabase
       .from('items')
       .update({ 
-        quantity: item.quantity - data.quantity,
+        quantity: item.quantity - item.transactionTotal,
         updated_at: new Date().toISOString()
       })
-      .eq('id', data.item_id)
+      .eq('id', item.id)
 
     if (updateError) throw updateError
 
     itemDetails.push({
-      ...item,
-      transactionQuantity: data.quantity,
-      transactionNotes: data.notes || globalNotes,
+      name: item.name,
+      sku: item.sku,
+      unit: item.unit,
+      quantity: item.quantity,
+      transactionQuantity: item.transactionTotal,
+      transactionNotes: globalNotes,
     })
   }
 
@@ -309,7 +344,6 @@ export const stockOutMultiple = async (
   if (itemDetails.length > 0) {
     try {
       const { sendEmail, formatStockOutEmailMultiple } = await import('./email')
-      
       const { subject, html } = formatStockOutEmailMultiple(itemDetails, shop || 'Unknown')
       
       sendEmail({
@@ -325,7 +359,7 @@ export const stockOutMultiple = async (
   }
 }
 
-// Delete a transaction and restore stock (for outbound transactions)
+// Delete a transaction and restore or reverse stock
 export const deleteTransaction = async (transactionId: number) => {
   // Get transaction details
   const { data: transaction, error: transError } = await supabase
@@ -337,11 +371,6 @@ export const deleteTransaction = async (transactionId: number) => {
   if (transError) throw transError
   if (!transaction) throw new Error('Transaction not found')
 
-  // Only allow deletion of OUT transactions
-  if (transaction.type !== 'OUT') {
-    throw new Error('Can only delete outbound transactions')
-  }
-
   // Get current item quantity
   const { data: item } = await supabase
     .from('items')
@@ -351,6 +380,19 @@ export const deleteTransaction = async (transactionId: number) => {
 
   if (!item) throw new Error('Item not found')
 
+  // Calculate new quantity
+  let newQuantity = item.quantity
+  if (transaction.type === 'OUT') {
+    // Reversing a stock out means adding it back
+    newQuantity += transaction.quantity
+  } else if (transaction.type === 'IN') {
+    // Reversing a stock in means taking it away
+    newQuantity -= transaction.quantity
+    if (newQuantity < 0) {
+      throw new Error(`Cannot undo stock in. Current stock (${item.quantity}) is less than the quantity to remove (${transaction.quantity}).`)
+    }
+  }
+
   // Delete the transaction
   const { error: deleteError } = await supabase
     .from('transactions')
@@ -359,11 +401,11 @@ export const deleteTransaction = async (transactionId: number) => {
 
   if (deleteError) throw deleteError
 
-  // Restore the stock by adding the quantity back
+  // Update the stock
   const { error: updateError } = await supabase
     .from('items')
     .update({
-      quantity: item.quantity + transaction.quantity,
+      quantity: newQuantity,
       updated_at: new Date().toISOString()
     })
     .eq('id', transaction.item_id)
@@ -382,7 +424,7 @@ export const getDashboardSummary = async () => {
         unit,
         sku
       )
-    `).order('created_at', { ascending: false }).limit(10),
+    `).order('created_at', { ascending: false }),
   ])
 
   if (itemsResult.error) throw itemsResult.error
