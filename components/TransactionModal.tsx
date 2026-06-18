@@ -14,6 +14,7 @@ interface TransactionItem {
   item_id: number
   quantity: number
   notes: string
+  expiry_date?: string | null
 }
 
 export default function TransactionModal({ type, items, onClose, onSave }: TransactionModalProps) {
@@ -22,6 +23,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
     item_id: '',
     quantity: '',
     notes: '',
+    expiry_date: '',
   })
   const [shop, setShop] = useState('')
   const [globalNotes, setGlobalNotes] = useState('')
@@ -30,6 +32,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
   const [showItemDropdown, setShowItemDropdown] = useState(false)
   const [selectedItemIds, setSelectedItemIds] = useState<number[]>([])
   const [itemQuantities, setItemQuantities] = useState<Record<number, string>>({})
+  const [itemExpiryDates, setItemExpiryDates] = useState<Record<number, string>>({})
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -66,6 +69,9 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
         item_id: parseInt(currentItem.item_id),
         quantity: parseInt(currentItem.quantity),
         notes: currentItem.notes,
+        ...(type === 'IN' && currentItem.expiry_date
+          ? { expiry_date: currentItem.expiry_date }
+          : {}),
       },
     ])
 
@@ -74,6 +80,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
       item_id: '',
       quantity: '',
       notes: '',
+      expiry_date: '',
     })
     setItemSearchTerm('')
     setShowItemDropdown(false)
@@ -92,6 +99,9 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
         const newQuantities = { ...itemQuantities }
         delete newQuantities[itemId]
         setItemQuantities(newQuantities)
+        const newExpiryDates = { ...itemExpiryDates }
+        delete newExpiryDates[itemId]
+        setItemExpiryDates(newExpiryDates)
       } else {
         // Add to selection
         setSelectedItemIds([...selectedItemIds, itemId])
@@ -126,6 +136,9 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
         item_id: itemId,
         quantity: parseInt(quantity),
         notes: '',
+        ...(type === 'IN' && itemExpiryDates[itemId]
+          ? { expiry_date: itemExpiryDates[itemId] }
+          : {}),
       })
     }
 
@@ -139,6 +152,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
     // Reset selections
     setSelectedItemIds([])
     setItemQuantities({})
+    setItemExpiryDates({})
     setItemSearchTerm('')
     setShowItemDropdown(false)
   }
@@ -318,6 +332,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
                       onClick={() => {
                         setSelectedItemIds([])
                         setItemQuantities({})
+                        setItemExpiryDates({})
                       }}
                       className="text-xs text-neutral-500 hover:text-ink font-mono uppercase tracking-widest"
                     >
@@ -340,6 +355,20 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
+                            {type === 'IN' && (
+                              <input
+                                type="date"
+                                value={itemExpiryDates[itemId] || ''}
+                                onChange={(e) =>
+                                  setItemExpiryDates({
+                                    ...itemExpiryDates,
+                                    [itemId]: e.target.value,
+                                  })
+                                }
+                                title="Expiry date (optional)"
+                                className="w-32 px-2 py-2 rounded-sm border border-neutral-200 bg-white focus:outline-none focus:ring-1 focus:ring-ink font-mono text-xs"
+                              />
+                            )}
                             <input
                               type="number"
                               value={itemQuantities[itemId] || ''}
@@ -379,7 +408,22 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
 
               {/* Single Item Add (for backward compatibility) */}
               {selectedItemIds.length === 0 && currentItem.item_id && (
-                <div className="grid grid-cols-2 gap-3 min-w-0">
+                <div className={`grid gap-3 min-w-0 ${type === 'IN' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'}`}>
+                  {type === 'IN' && (
+                    <div className="min-w-0">
+                      <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
+                        Expiry Date (optional)
+                      </label>
+                      <input
+                        type="date"
+                        value={currentItem.expiry_date}
+                        onChange={(e) =>
+                          setCurrentItem({ ...currentItem, expiry_date: e.target.value })
+                        }
+                        className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
+                      />
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
                       Quantity
@@ -439,6 +483,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
                         <div className="font-serif text-sm text-ink truncate">{item?.name || 'Unknown'}</div>
                         <div className="font-mono text-[10px] text-neutral-500 truncate">
                           {ti.quantity} {item?.unit || 'pcs'}
+                          {type === 'IN' && ti.expiry_date && ` · exp ${ti.expiry_date}`}
                           {ti.notes && ` · ${ti.notes}`}
                         </div>
                       </div>
