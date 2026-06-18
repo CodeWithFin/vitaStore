@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "VitaStore Inventory Management System",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "dev:turbo": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

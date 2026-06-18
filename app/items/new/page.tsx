@@ -16,12 +16,13 @@ interface NewItem {
   unit: string
   quantity: string
   min_stock: string
+  expiry_date: string
 }
 
 export default function NewItemsPage() {
   const router = useRouter()
   const [items, setItems] = useState<NewItem[]>([
-    { name: '', sku: '', category: '', price: '', unit: 'pcs', quantity: '0', min_stock: '5' }
+    { name: '', sku: '', category: '', price: '', unit: 'pcs', quantity: '0', min_stock: '5', expiry_date: '' }
   ])
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
@@ -47,7 +48,7 @@ export default function NewItemsPage() {
   }
 
   const handleAddItem = () => {
-    setItems([...items, { name: '', sku: '', category: '', price: '', unit: 'pcs', quantity: '0', min_stock: '5' }])
+    setItems([...items, { name: '', sku: '', category: '', price: '', unit: 'pcs', quantity: '0', min_stock: '5', expiry_date: '' }])
   }
 
   const handleRemoveItem = (index: number) => {
@@ -71,6 +72,14 @@ export default function NewItemsPage() {
       return
     }
 
+    const hasExpiryWithoutStock = items.some(
+      (item) => item.expiry_date && (!item.quantity || parseInt(item.quantity) <= 0)
+    )
+    if (hasExpiryWithoutStock) {
+      showNotification('Please enter stock greater than 0 for any row with an expiry date', 'error')
+      return
+    }
+
     setLoading(true)
     try {
       const formattedItems = items.map(item => ({
@@ -78,6 +87,7 @@ export default function NewItemsPage() {
         price: item.price ? parseFloat(item.price) : 0,
         quantity: parseInt(item.quantity) || 0,
         min_stock: parseInt(item.min_stock) || 0,
+        expiry_date: item.expiry_date || null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }))
@@ -134,7 +144,7 @@ export default function NewItemsPage() {
         {/* Form Container */}
         <form onSubmit={handleSubmit} className="vellum-glass rounded-sm border border-neutral-200/60 overflow-hidden shadow-lg">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1000px]">
+            <table className="w-full text-left border-collapse min-w-[1100px]">
               <thead>
                 <tr className="border-b border-neutral-200/60 bg-neutral-50/50">
                   <th className="px-4 py-4 font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-12 text-center">#</th>
@@ -144,6 +154,7 @@ export default function NewItemsPage() {
                   <th className="px-4 py-4 font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-24">Price</th>
                   <th className="px-4 py-4 font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-20">Unit</th>
                   <th className="px-4 py-4 font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-24">Stock</th>
+                  <th className="px-4 py-4 font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-36">Expiry</th>
                   <th className="px-4 py-4 font-mono text-[10px] uppercase tracking-widest text-neutral-500 w-12"></th>
                 </tr>
               </thead>
@@ -213,6 +224,14 @@ export default function NewItemsPage() {
                         className="w-full bg-transparent border-none focus:ring-0 font-mono text-xs p-0 placeholder:text-neutral-300 text-center"
                       />
                     </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="date"
+                        value={item.expiry_date}
+                        onChange={(e) => handleChange(index, 'expiry_date', e.target.value)}
+                        className="w-full bg-transparent border-none focus:ring-0 font-mono text-xs p-0 text-neutral-600"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"
@@ -260,7 +279,7 @@ export default function NewItemsPage() {
               </li>
               <li className="flex gap-3">
                 <span className="text-neutral-400 font-mono text-xs mt-1">03.</span>
-                <span>The initial stock level you enter will be set as the starting quantity.</span>
+                <span>Set stock and expiry date together — expiry requires stock greater than 0.</span>
               </li>
             </ul>
           </div>

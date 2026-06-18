@@ -14,6 +14,72 @@ interface TransactionItem {
   item_id: number
   quantity: number
   notes: string
+  expiry_date?: string | null
+}
+
+const formatBatchExpiry = (date: string | null) => {
+  if (!date) return 'No expiry'
+  return new Date(date).toLocaleDateString('en-KE', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+const getFefoBatches = (item: any) =>
+  (item.batches || [])
+    .filter((batch: any) => batch.quantity > 0)
+    .sort((a: any, b: any) => {
+      if (!a.expiry_date && !b.expiry_date) return 0
+      if (!a.expiry_date) return 1
+      if (!b.expiry_date) return -1
+      return new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime()
+    })
+
+function FefoBatchPreview({
+  item,
+  deductQty,
+}: {
+  item: any
+  deductQty?: number
+}) {
+  const batches = getFefoBatches(item)
+  if (batches.length === 0) return null
+
+  let remaining =
+    deductQty && deductQty > 0 ? deductQty : null
+
+  return (
+    <div className="bg-amber-50/80 border border-amber-200/60 rounded-sm p-3 text-xs space-y-1.5">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-amber-800">
+        Closest expiry moved out first
+      </p>
+      {batches.map((batch: any, index: number) => {
+        let willDeduct = 0
+        if (remaining !== null) {
+          willDeduct = Math.min(batch.quantity, remaining)
+          remaining -= willDeduct
+        }
+
+        return (
+          <div
+            key={batch.id}
+            className={`flex justify-between gap-2 font-mono ${
+              index === 0 ? 'text-amber-900' : 'text-neutral-600'
+            }`}
+          >
+            <span>
+              {willDeduct > 0 ? '→ ' : ''}
+              {batch.quantity} {item.unit || 'pcs'} · {formatBatchExpiry(batch.expiry_date)}
+            </span>
+            {willDeduct > 0 && (
+              <span className="text-amber-800 font-medium flex-shrink-0">−{willDeduct}</span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 export default function TransactionModal({ type, items, onClose, onSave }: TransactionModalProps) {
@@ -22,6 +88,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
     item_id: '',
     quantity: '',
     notes: '',
+    expiry_date: '',
   })
   const [shop, setShop] = useState('')
   const [globalNotes, setGlobalNotes] = useState('')
@@ -30,6 +97,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
   const [showItemDropdown, setShowItemDropdown] = useState(false)
   const [selectedItemIds, setSelectedItemIds] = useState<number[]>([])
   const [itemQuantities, setItemQuantities] = useState<Record<number, string>>({})
+  const [itemExpiryDates, setItemExpiryDates] = useState<Record<number, string>>({})
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -66,6 +134,9 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
         item_id: parseInt(currentItem.item_id),
         quantity: parseInt(currentItem.quantity),
         notes: currentItem.notes,
+        ...(type === 'IN' && currentItem.expiry_date
+          ? { expiry_date: currentItem.expiry_date }
+          : {}),
       },
     ])
 
@@ -74,6 +145,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
       item_id: '',
       quantity: '',
       notes: '',
+      expiry_date: '',
     })
     setItemSearchTerm('')
     setShowItemDropdown(false)
@@ -92,6 +164,9 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
         const newQuantities = { ...itemQuantities }
         delete newQuantities[itemId]
         setItemQuantities(newQuantities)
+        const newExpiryDates = { ...itemExpiryDates }
+        delete newExpiryDates[itemId]
+        setItemExpiryDates(newExpiryDates)
       } else {
         // Add to selection
         setSelectedItemIds([...selectedItemIds, itemId])
@@ -126,6 +201,9 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
         item_id: itemId,
         quantity: parseInt(quantity),
         notes: '',
+        ...(type === 'IN' && itemExpiryDates[itemId]
+          ? { expiry_date: itemExpiryDates[itemId] }
+          : {}),
       })
     }
 
@@ -139,6 +217,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
     // Reset selections
     setSelectedItemIds([])
     setItemQuantities({})
+    setItemExpiryDates({})
     setItemSearchTerm('')
     setShowItemDropdown(false)
   }
@@ -193,6 +272,12 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto overflow-x-hidden pr-1">
+          {type === 'OUT' && (
+            <div className="bg-amber-50 border border-amber-200/60 rounded-sm px-4 py-3 font-serif text-xs text-amber-900">
+              When an item has multiple expiry dates, stock is always taken from the batch expiring soonest first.
+            </div>
+          )}
+
           {/* Transaction Date */}
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
@@ -301,9 +386,10 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
               )}
 
               {selectedItem && type === 'OUT' && selectedItemIds.length === 0 && (
-                <div className="bg-yellow-100/50 border border-yellow-200/50 rounded-sm p-2 text-xs text-yellow-800 font-serif">
-                  Available: {selectedItem.quantity} {selectedItem.unit || 'pcs'}
-                </div>
+                <FefoBatchPreview
+                  item={selectedItem}
+                  deductQty={parseInt(currentItem.quantity) || undefined}
+                />
               )}
 
               {/* Selected Items with Quantities */}
@@ -318,6 +404,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
                       onClick={() => {
                         setSelectedItemIds([])
                         setItemQuantities({})
+                        setItemExpiryDates({})
                       }}
                       className="text-xs text-neutral-500 hover:text-ink font-mono uppercase tracking-widest"
                     >
@@ -338,8 +425,27 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
                             <div className="font-mono text-[10px] text-neutral-500">
                               {item.quantity} {item.unit || 'pcs'} available
                             </div>
+                            {type === 'OUT' && getFefoBatches(item).length > 1 && (
+                              <div className="font-mono text-[9px] text-amber-700 mt-1">
+                                {getFefoBatches(item).length} batches · FEFO applies
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
+                            {type === 'IN' && (
+                              <input
+                                type="date"
+                                value={itemExpiryDates[itemId] || ''}
+                                onChange={(e) =>
+                                  setItemExpiryDates({
+                                    ...itemExpiryDates,
+                                    [itemId]: e.target.value,
+                                  })
+                                }
+                                title="Expiry date (optional)"
+                                className="w-32 px-2 py-2 rounded-sm border border-neutral-200 bg-white focus:outline-none focus:ring-1 focus:ring-ink font-mono text-xs"
+                              />
+                            )}
                             <input
                               type="number"
                               value={itemQuantities[itemId] || ''}
@@ -379,7 +485,22 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
 
               {/* Single Item Add (for backward compatibility) */}
               {selectedItemIds.length === 0 && currentItem.item_id && (
-                <div className="grid grid-cols-2 gap-3 min-w-0">
+                <div className={`grid gap-3 min-w-0 ${type === 'IN' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-2'}`}>
+                  {type === 'IN' && (
+                    <div className="min-w-0">
+                      <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
+                        Expiry Date (optional)
+                      </label>
+                      <input
+                        type="date"
+                        value={currentItem.expiry_date}
+                        onChange={(e) =>
+                          setCurrentItem({ ...currentItem, expiry_date: e.target.value })
+                        }
+                        className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
+                      />
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
                       Quantity
@@ -439,6 +560,7 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
                         <div className="font-serif text-sm text-ink truncate">{item?.name || 'Unknown'}</div>
                         <div className="font-mono text-[10px] text-neutral-500 truncate">
                           {ti.quantity} {item?.unit || 'pcs'}
+                          {type === 'IN' && ti.expiry_date && ` · exp ${ti.expiry_date}`}
                           {ti.notes && ` · ${ti.notes}`}
                         </div>
                       </div>

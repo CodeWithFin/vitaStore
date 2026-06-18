@@ -48,15 +48,37 @@ export default function ExpiringPage() {
   const oneYearFromNow = new Date()
   oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1)
 
-  const expiringItems = items
-    .filter((item) => {
-      if (!item.expiry_date) return false
-      const expiryDate = new Date(item.expiry_date)
+  type ExpiringEntry = {
+    item: any
+    batch: { id: number; quantity: number; expiry_date: string }
+    expiry_date: string
+    quantity: number
+  }
+
+  const expiringItems: ExpiringEntry[] = items
+    .flatMap((item) => {
+      const batches = item.batches?.length
+        ? item.batches
+        : item.expiry_date
+          ? [{ id: 0, quantity: item.quantity, expiry_date: item.expiry_date }]
+          : []
+
+      return batches
+        .filter((batch: any) => batch.expiry_date && batch.quantity > 0)
+        .map((batch: any) => ({
+          item,
+          batch,
+          expiry_date: batch.expiry_date,
+          quantity: batch.quantity,
+        }))
+    })
+    .filter((entry) => {
+      const expiryDate = new Date(entry.expiry_date)
       const searchLower = searchTerm.toLowerCase()
-      const matchesSearch = 
-        item.name?.toLowerCase().includes(searchLower) || 
-        item.sku?.toLowerCase().includes(searchLower)
-      
+      const matchesSearch =
+        entry.item.name?.toLowerCase().includes(searchLower) ||
+        entry.item.sku?.toLowerCase().includes(searchLower)
+
       return matchesSearch && expiryDate <= oneYearFromNow && expiryDate >= new Date()
     })
     .sort((a, b) => {
@@ -141,13 +163,14 @@ export default function ExpiringPage() {
                 <p>No products expiring within a year found</p>
               </div>
             ) : (
-              expiringItems.map((item) => {
-                const daysUntilExpiry = getDaysUntilExpiry(item.expiry_date)
+              expiringItems.map((entry) => {
+                const { item, batch, expiry_date: expiryDate, quantity } = entry
+                const daysUntilExpiry = getDaysUntilExpiry(expiryDate)
                 const isExpiringSoon = daysUntilExpiry <= 30
                 const isExpiringVerySoon = daysUntilExpiry <= 7
 
                 return (
-                  <div key={item.id} className="px-6 py-5 hover:bg-white/40 transition-colors group">
+                  <div key={`${item.id}-${batch.id}-${expiryDate}`} className="px-6 py-5 hover:bg-white/40 transition-colors group">
                     <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                       <div className="flex gap-4 flex-1 min-w-0">
                         <div className="flex-shrink-0 mt-1">
@@ -177,7 +200,7 @@ export default function ExpiringPage() {
                           </div>
                           <div className="flex flex-wrap items-center gap-4">
                             <span className="font-mono text-xs text-neutral-500">
-                              Stock: <span className="text-[#1C1917] font-bold">{item.quantity} {item.unit || 'pcs'}</span>
+                              Batch stock: <span className="text-[#1C1917] font-bold">{quantity} {item.unit || 'pcs'}</span>
                             </span>
                             <span className="font-serif text-xs px-2 py-0.5 bg-white/50 border border-neutral-100 rounded-sm text-neutral-400 italic">
                               {item.category || 'No Category'}
@@ -190,7 +213,7 @@ export default function ExpiringPage() {
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-neutral-400" />
                           <span className="font-mono text-[11px] text-neutral-600 font-bold">
-                            {new Date(item.expiry_date).toLocaleDateString('en-KE', { 
+                            {new Date(expiryDate).toLocaleDateString('en-KE', {
                               day: 'numeric', 
                               month: 'long',
                               year: 'numeric'
