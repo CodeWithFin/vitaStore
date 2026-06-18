@@ -43,6 +43,8 @@ const normalizeItem = (item: any): ItemWithStock => ({
   batches: normalizeBatches(item.batches),
 })
 
+const optionalSku = (sku: string | null | undefined) => sku ?? undefined
+
 const findExistingItem = async (sku?: string | null, name?: string) => {
   if (sku?.trim()) {
     const { data } = await supabase
@@ -258,7 +260,7 @@ export const stockIn = async (data: {
       item.name,
       data.quantity,
       item.unit || 'pcs',
-      item.sku,
+      optionalSku(item.sku),
       data.notes
     )
 
@@ -308,7 +310,7 @@ export const stockOut = async (data: {
       data.quantity,
       item.unit || 'pcs',
       data.shop || 'Unknown',
-      item.sku,
+      optionalSku(item.sku),
       data.notes
     )
 
@@ -353,7 +355,7 @@ export const stockInMultiple = async (
 
     itemDetails.push({
       name: item.name,
-      sku: item.sku,
+      sku: optionalSku(item.sku),
       unit: item.unit,
       quantity: item.quantity,
       transactionQuantity: data.quantity,
@@ -427,7 +429,7 @@ export const stockOutMultiple = async (
 
     itemDetails.push({
       name: item.name,
-      sku: item.sku,
+      sku: optionalSku(item.sku),
       unit: item.unit,
       quantity: item.quantity,
       transactionQuantity: item.transactionTotal,
