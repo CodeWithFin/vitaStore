@@ -27,18 +27,34 @@ export default function ItemModal({ item, onClose, onSave }: ItemModalProps) {
         name: item.name || '',
         sku: item.sku || '',
         category: item.category || '',
-        quantity: item.quantity || 0,
+        quantity: 0,
         min_stock: item.min_stock || 0,
         unit: item.unit || 'pcs',
         price: item.price || 0,
-        expiry_date: item.expiry_date || '',
+        expiry_date: '',
+      })
+    } else {
+      setFormData({
+        name: '',
+        sku: '',
+        category: '',
+        quantity: 0,
+        min_stock: 0,
+        unit: 'pcs',
+        price: 0,
+        expiry_date: '',
       })
     }
   }, [item])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Convert empty expiry_date to null for optional field
+
+    if (formData.expiry_date && (!formData.quantity || formData.quantity <= 0)) {
+      alert('Please enter a quantity greater than 0 when setting an expiry date')
+      return
+    }
+
     const submitData = {
       ...formData,
       expiry_date: formData.expiry_date || null,
@@ -114,14 +130,19 @@ export default function ItemModal({ item, onClose, onSave }: ItemModalProps) {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
-                Quantity *
+                {item ? 'Add Stock (optional)' : 'Quantity *'}
               </label>
+              {item && (
+                <p className="text-xs text-neutral-500 mb-2 font-mono">
+                  Current stock: {item.quantity} {item.unit || 'pcs'}
+                </p>
+              )}
               <input
                 type="number"
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleChange}
-                required
+                required={!item}
                 min="0"
                 className="w-full px-4 py-3 rounded-sm border border-neutral-200 bg-white/50 focus:outline-none focus:ring-1 focus:ring-ink font-mono"
               />
@@ -171,8 +192,13 @@ export default function ItemModal({ item, onClose, onSave }: ItemModalProps) {
             </div>
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
-                Expiry Date (optional)
+                {item ? 'Batch Expiry Date (optional)' : 'Expiry Date (optional)'}
               </label>
+              {item && (
+                <p className="text-xs text-neutral-500 mb-2 font-mono">
+                  Applies to the stock you add above
+                </p>
+              )}
               <input
                 type="date"
                 name="expiry_date"
