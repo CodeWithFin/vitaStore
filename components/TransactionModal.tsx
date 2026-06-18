@@ -17,6 +17,71 @@ interface TransactionItem {
   expiry_date?: string | null
 }
 
+const formatBatchExpiry = (date: string | null) => {
+  if (!date) return 'No expiry'
+  return new Date(date).toLocaleDateString('en-KE', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+const getFefoBatches = (item: any) =>
+  (item.batches || [])
+    .filter((batch: any) => batch.quantity > 0)
+    .sort((a: any, b: any) => {
+      if (!a.expiry_date && !b.expiry_date) return 0
+      if (!a.expiry_date) return 1
+      if (!b.expiry_date) return -1
+      return new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime()
+    })
+
+function FefoBatchPreview({
+  item,
+  deductQty,
+}: {
+  item: any
+  deductQty?: number
+}) {
+  const batches = getFefoBatches(item)
+  if (batches.length === 0) return null
+
+  let remaining =
+    deductQty && deductQty > 0 ? deductQty : null
+
+  return (
+    <div className="bg-amber-50/80 border border-amber-200/60 rounded-sm p-3 text-xs space-y-1.5">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-amber-800">
+        Closest expiry moved out first
+      </p>
+      {batches.map((batch: any, index: number) => {
+        let willDeduct = 0
+        if (remaining !== null) {
+          willDeduct = Math.min(batch.quantity, remaining)
+          remaining -= willDeduct
+        }
+
+        return (
+          <div
+            key={batch.id}
+            className={`flex justify-between gap-2 font-mono ${
+              index === 0 ? 'text-amber-900' : 'text-neutral-600'
+            }`}
+          >
+            <span>
+              {willDeduct > 0 ? '→ ' : ''}
+              {batch.quantity} {item.unit || 'pcs'} · {formatBatchExpiry(batch.expiry_date)}
+            </span>
+            {willDeduct > 0 && (
+              <span className="text-amber-800 font-medium flex-shrink-0">−{willDeduct}</span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function TransactionModal({ type, items, onClose, onSave }: TransactionModalProps) {
   const [transactionItems, setTransactionItems] = useState<TransactionItem[]>([])
   const [currentItem, setCurrentItem] = useState({
@@ -207,6 +272,12 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 flex-1 overflow-y-auto overflow-x-hidden pr-1">
+          {type === 'OUT' && (
+            <div className="bg-amber-50 border border-amber-200/60 rounded-sm px-4 py-3 font-serif text-xs text-amber-900">
+              When an item has multiple expiry dates, stock is always taken from the batch expiring soonest first.
+            </div>
+          )}
+
           {/* Transaction Date */}
           <div>
             <label className="block text-[10px] font-mono uppercase tracking-widest text-neutral-500 mb-2">
@@ -315,9 +386,10 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
               )}
 
               {selectedItem && type === 'OUT' && selectedItemIds.length === 0 && (
-                <div className="bg-yellow-100/50 border border-yellow-200/50 rounded-sm p-2 text-xs text-yellow-800 font-serif">
-                  Available: {selectedItem.quantity} {selectedItem.unit || 'pcs'}
-                </div>
+                <FefoBatchPreview
+                  item={selectedItem}
+                  deductQty={parseInt(currentItem.quantity) || undefined}
+                />
               )}
 
               {/* Selected Items with Quantities */}
@@ -353,6 +425,11 @@ export default function TransactionModal({ type, items, onClose, onSave }: Trans
                             <div className="font-mono text-[10px] text-neutral-500">
                               {item.quantity} {item.unit || 'pcs'} available
                             </div>
+                            {type === 'OUT' && getFefoBatches(item).length > 1 && (
+                              <div className="font-mono text-[9px] text-amber-700 mt-1">
+                                {getFefoBatches(item).length} batches · FEFO applies
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             {type === 'IN' && (

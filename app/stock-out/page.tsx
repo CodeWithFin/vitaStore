@@ -149,6 +149,12 @@ export default function StockOutPage() {
           </button>
         </header>
 
+        <div className="vellum-glass rounded-sm p-4 border border-amber-200/60 bg-amber-50/40">
+          <p className="font-serif text-sm text-amber-900">
+            Products with more than one expiry date are dispatched using FEFO — the batch closest to expiring is reduced first.
+          </p>
+        </div>
+
         {/* Search and Filters */}
         <div className="vellum-glass rounded-sm p-4 border border-neutral-200/60 flex items-center gap-4">
           <div className="relative flex-1">
