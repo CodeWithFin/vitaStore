@@ -43,6 +43,44 @@ interface NotificationState {
   type: 'success' | 'error' | 'info'
 }
 
+const formatBatchDate = (date: string | null) => {
+  if (!date) return 'No expiry'
+  return new Date(date).toLocaleDateString('en-KE', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function BatchBreakdown({ item }: { item: any }) {
+  const batches = (item.batches || []).filter((b: any) => b.quantity > 0)
+
+  if (batches.length === 0) {
+    return (
+      <span className="font-mono text-[10px] text-neutral-400 italic">
+        No batch data
+      </span>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1 mt-1">
+      {batches.map((batch: any) => (
+        <div
+          key={batch.id}
+          className="font-mono text-[10px] text-neutral-500 flex items-center gap-1.5"
+        >
+          <Calendar className="w-3 h-3 text-neutral-400 flex-shrink-0" />
+          <span className="text-[#1C1917]">{batch.quantity}</span>
+          <span>{item.unit || 'pcs'}</span>
+          <span className="text-neutral-400">·</span>
+          <span>{formatBatchDate(batch.expiry_date)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const [summary, setSummary] = useState<any>(null)
   const [items, setItems] = useState<any[]>([])
@@ -715,6 +753,9 @@ export default function Dashboard() {
                                 <span className="font-mono text-[10px] text-[#78350F]/70 uppercase tracking-widest">
                                   {item.quantity} {item.unit || 'pcs'}
                                 </span>
+                                <div className="mt-1">
+                                  <BatchBreakdown item={item} />
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -722,9 +763,12 @@ export default function Dashboard() {
                             <span className="font-mono text-xs text-neutral-500">{item.sku}</span>
                           </td>
                           <td className="py-3 hidden md:table-cell">
-                            <span className="font-serif text-sm text-[#1C1917]">
-                              {item.quantity} {item.unit || 'pcs'}
-                            </span>
+                            <div>
+                              <span className="font-serif text-sm text-[#1C1917]">
+                                {item.quantity} {item.unit || 'pcs'}
+                              </span>
+                              <BatchBreakdown item={item} />
+                            </div>
                           </td>
                           <td className="py-3 hidden md:table-cell">
                             <span
@@ -793,6 +837,10 @@ export default function Dashboard() {
                                     {isOutOfStock ? 'Out' : isLowStock ? 'Low' : 'OK'}
                                   </span>
                                 </div>
+                                <div className="space-y-1 col-span-2">
+                                  <span className="block text-[9px] font-mono uppercase tracking-widest text-neutral-400">Batches</span>
+                                  <BatchBreakdown item={item} />
+                                </div>
                                 <div className="col-span-2 pt-2 flex items-center gap-3 border-t border-neutral-200/40">
                                   <button
                                     onClick={() => openEditItem(item)}
@@ -831,6 +879,7 @@ export default function Dashboard() {
 
       {showItemModal && (
         <ItemModal
+          key={editingItem?.id ?? 'new'}
           item={editingItem}
           onClose={() => {
             setShowItemModal(false)
